@@ -481,16 +481,19 @@ function finishEdit(commit) {
   R.mkEdit = ''; renderToc();
 }
 function pasteModal() {
-  const t = TL(); const m = document.createElement('div'); m.className = 'scrim'; m.id = 'mk-modal'; m.style.zIndex = 140;
+  const old = document.getElementById('mk-modal'); if (old) { old.remove(); return; }   // 다시 누르면 접힌다
+  const t = TL(); const m = document.createElement('div'); m.className = 'mk-drop'; m.id = 'mk-modal';
+  const btn = document.querySelector('.reader [data-r="mk-paste"]'); const br = btn ? btn.getBoundingClientRect() : { left: 20, bottom: 90 };
+  const w = Math.min(480, window.innerWidth - 24); m.style.width = w + 'px'; m.style.top = Math.round(br.bottom + 6) + 'px'; m.style.left = Math.round(Math.max(12, Math.min(br.left, window.innerWidth - w - 12))) + 'px';
   const hasP = R.pnum && R.pnum.length;
-  m.innerHTML = `<div class="modal" style="width:560px"><header><h2>목차 붙여넣기</h2></header><div class="mb">
+  m.innerHTML = `<div class="mk-dh"><b>목차 붙여넣기</b><button class="btn sm" data-x="no" title="접기 (Esc)">✕</button></div><div class="mb">
     <p class="help">책의 목차 글을 붙여 넣으세요. "제목 ··· 23" 처럼 줄 끝에 인쇄 쪽 번호가 있으면 읽어 들입니다. 들여쓰기와 번호(1.1)로 장·절을 나눕니다.</p>
     <textarea id="mk-text" rows="9" class="mk-ta" placeholder="제1장 서론 ........ 13&#10;  1.1 연구의 목적 ...... 15&#10;제2장 교회와 직분 ...... 45"></textarea>
     <div class="mk-off"><span>PDF 쪽 = 인쇄 쪽 +</span><input id="mk-off" type="number" value="0" style="width:72px"><button class="btn sm" id="mk-here" title="목차의 첫 항목이 있는 쪽을 PDF에서 열어 둔 채로 누르세요">첫 항목 = 지금 쪽(p.${R.page})</button>
       ${hasP ? '<label class="mk-auto"><input type="checkbox" id="mk-auto" checked> 인쇄 쪽 번호 기능으로 자동 계산</label>' : ''}</div>
     <p class="help" id="mk-prev" style="min-height:2.6em"></p>
     <label class="mk-auto"><input type="checkbox" id="mk-rep"> 기존 내 책갈피를 모두 바꾸기(끄면 추가)</label>
-  </div><footer><button class="btn" data-x="no">취소</button><button class="btn primary" data-x="ok" disabled>반영</button></footer></div>`;
+  </div><footer><button class="btn" data-x="no">취소</button><button class="btn primary" data-x="ok" disabled>반영</button></footer>`;
   document.body.appendChild(m);
   const ta = $('#mk-text', m), off = $('#mk-off', m), prev = $('#mk-prev', m), ok = $('[data-x=ok]', m), auto = $('#mk-auto', m);
   let items = [], timer = 0;
@@ -509,7 +512,7 @@ function pasteModal() {
     if ($('#mk-rep', m).checked) R.marks = [];
     for (const g of good) R.marks.push({ id: 'm' + Math.random().toString(36).slice(2, 9), page: g.page, title: g.title, level: g.level });
     sortMarks(); mkCount(); saveMarks(); renderToc(); t.toast && t.toast(`책갈피 ${good.length}개를 추가했습니다.`); };
-  m.addEventListener('click', (e) => { const x = e.target.closest('[data-x]'); if (x) done(x.dataset.x === 'ok'); else if (e.target === m) done(false); });
+  m.addEventListener('click', (e) => { const x = e.target.closest('[data-x]'); if (x) done(x.dataset.x === 'ok'); });   // 바깥을 눌러도 닫히지 않는다: 책을 보면서 붙여 넣을 수 있게
   m.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Escape') done(false); });
   ta.focus();
 }
@@ -585,9 +588,9 @@ function bind(el) {
 document.addEventListener('keydown', (e) => {
   if (!R) return;
   const typing = /input|textarea|select/i.test(document.activeElement && document.activeElement.tagName);
-  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && (e.key === 'f' || e.key === 'F') && !document.getElementById('modal') && !document.getElementById('mk-modal')) { e.preventDefault(); const q = $('#r-q'); if (q) { q.focus(); q.select(); } return; }
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && (e.key === 'f' || e.key === 'F') && !document.getElementById('modal')) { e.preventDefault(); const q = $('#r-q'); if (q) { q.focus(); q.select(); } return; }
   if (e.key === 'Escape' && e.target && e.target.matches && e.target.matches('.mk-in,#r-q,#mk-text')) return;
-  if (e.key === 'Escape' && !document.getElementById('modal') && !document.getElementById('mk-modal')) { e.preventDefault(); close(); return; }
+  if (e.key === 'Escape' && !document.getElementById('modal')) { const d = document.getElementById('mk-modal'); e.preventDefault(); if (d) d.remove(); else close(); return; }
   if (typing) return;
   if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && (e.key === 'd' || e.key === 'D')) { e.preventDefault(); addHere(); return; }
   if (e.key === 'ArrowRight') { e.preventDefault(); goTo(R.page + 1); }
@@ -602,6 +605,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden && R &
 
 async function close(silent) {
   if (!R) return;
+  { const d = document.getElementById('mk-modal'); if (d) d.remove(); }
   const r = R; if (r.N) await flush(false);
   r.closed = true; clearTimeout(r.saveTimer); r.token = Symbol(); r.find = null;
   try { r.io && r.io.disconnect(); } catch {}

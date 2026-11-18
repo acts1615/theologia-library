@@ -276,7 +276,7 @@ body.side-off .side{display:none}
 .mk-ta{width:100%;min-height:170px;padding:9px 11px;border:1px solid var(--line-strong,#d5d9cc);border-radius:8px;font-size:13.5px;line-height:1.5;resize:vertical}
 .mk-ta:focus,.mk-in:focus,#mk-modal input[type=number]:focus{outline:2px solid var(--olive,#6d7b5a);outline-offset:-1px;border-color:var(--olive,#6d7b5a)}
 .mk-ta::placeholder,.mk-in::placeholder,.r-find input::placeholder{color:#8a8e84;-webkit-text-fill-color:#8a8e84;opacity:1}
-#mk-modal .modal,#mk-modal .modal p,#mk-modal .modal label,#mk-modal .modal span{color:var(--ink,#2d302b)}
+#mk-modal,#mk-modal p,#mk-modal label,#mk-modal span{color:var(--ink,#2d302b)}
 #mk-modal .help{color:#5d6158}
 .reader,#mk-modal{color-scheme:light}#mk-modal input[type=checkbox]{accent-color:var(--olive,#6d7b5a)}
 .reader.ep .ep-wrap{position:relative;flex:1;min-width:0;background:#4a4a46}
@@ -288,3 +288,11 @@ body.side-off .side{display:none}
 .brand .ver{margin-left:4px;padding:1px 5px;border-radius:5px;background:#0000000d;color:var(--muted);font-size:10.5px;white-space:nowrap}
 .upd{position:fixed;left:14px;bottom:150px;width:226px;z-index:110;background:#fffdf5;border:1px solid #d9c9a0;border-radius:12px;padding:10px 12px;box-shadow:0 8px 24px #2d302b2b;font-size:12.5px;display:flex;flex-direction:column;gap:4px}
 .upd small{color:var(--muted)}.upd div{display:flex;gap:6px;margin-top:6px}
+
+/* 목차 붙여넣기: 배경을 어둡게 하지 않는 드롭다운 */
+.mk-drop{position:fixed;z-index:140;background:#fff;border:1px solid #cfd2c4;border-radius:12px;box-shadow:0 14px 34px #2d302b33;max-height:calc(100vh - 110px);overflow:auto;display:flex;flex-direction:column}
+.mk-drop::before{content:"";position:absolute;top:-6px;left:26px;width:10px;height:10px;background:#fff;border-left:1px solid #cfd2c4;border-top:1px solid #cfd2c4;transform:rotate(45deg)}
+.mk-dh{display:flex;align-items:center;justify-content:space-between;padding:10px 14px 0}
+.mk-drop .mb{padding:8px 14px 4px}
+.mk-drop footer{display:flex;justify-content:flex-end;gap:8px;padding:8px 14px 12px}
+.mk-ta{min-height:130px}
