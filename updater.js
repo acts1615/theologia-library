@@ -21,7 +21,7 @@ function createUpdater({ dataDir, current, restart }) {
 
   async function check(force) {
     if (!force && last && Date.now() - lastAt < 6 * HOUR) return last;
-    const rel = await (await get(API)).json();
+    let rel; try { rel = await (await get(API)).json(); } catch (e) { if (/HTTP 404/.test(String(e.message))) { last = { current, available: false, note: '공개된 업데이트가 없습니다.' }; lastAt = Date.now(); return last; } throw e; }
     const assets = new Map((rel.assets || []).map((a) => [a.name, a]));
     const meta = assets.get('update.json'), pack = assets.get('app.asar');
     if (!meta || !pack) { last = { current, available: false, note: '공개된 업데이트가 없습니다.' }; lastAt = Date.now(); return last; }

@@ -1,8 +1,8 @@
-# 태그(v1.0.a.3 같은 이름)를 올리면 업데이트용 app.asar 와 update.json 을 만들어 릴리스에 붙입니다.
+# GitHub 의 Actions 탭 → release → Run workflow 를 누르면, build.json 의 버전으로 릴리스를 만들고
+# 업데이트용 app.asar 와 update.json 을 붙입니다.
 name: release
 on:
-  push:
-    tags: ['v*']
+  workflow_dispatch:
 permissions:
   contents: write
 jobs:
@@ -18,7 +18,6 @@ jobs:
         run: |
           VER=$(node -e "const b=require('./build.json');console.log(require('./version').versionOf(b.seq))")
           echo "ver=$VER" >> "$GITHUB_OUTPUT"
-          if [ "v$VER" != "$GITHUB_REF_NAME" ]; then echo "태그($GITHUB_REF_NAME)와 build.json 버전(v$VER)이 다릅니다."; exit 1; fi
       - name: 앱 묶기
         run: |
           mkdir stage
@@ -34,4 +33,4 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" app.asar update.json --title "ver${{ steps.v.outputs.ver }}" --notes-file RELEASE_NOTES.txt --latest
+          gh release create "v${{ steps.v.outputs.ver }}" --target "$GITHUB_SHA" app.asar update.json --title "ver${{ steps.v.outputs.ver }}" --notes-file RELEASE_NOTES.txt --latest
