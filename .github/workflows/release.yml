@@ -1,0 +1,37 @@
+# 태그(v1.0.a.3 같은 이름)를 올리면 업데이트용 app.asar 와 update.json 을 만들어 릴리스에 붙입니다.
+name: release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: 버전 확인
+        id: v
+        run: |
+          VER=$(node -e "const b=require('./build.json');console.log(require('./version').versionOf(b.seq))")
+          echo "ver=$VER" >> "$GITHUB_OUTPUT"
+          if [ "v$VER" != "$GITHUB_REF_NAME" ]; then echo "태그($GITHUB_REF_NAME)와 build.json 버전(v$VER)이 다릅니다."; exit 1; fi
+      - name: 앱 묶기
+        run: |
+          mkdir stage
+          tar --exclude=./.git --exclude=./.github --exclude=./stage -cf - . | tar -xf - -C stage
+          (cd stage && npm ci --omit=dev --no-audit --no-fund)
+          npx --yes @electron/asar pack stage app.asar
+          SHA=$(sha256sum app.asar | cut -d' ' -f1)
+          SEQ=$(node -e "console.log(require('./build.json').seq)")
+          NOTES=$(cat RELEASE_NOTES.txt 2>/dev/null | head -c 1500 || true)
+          node -e "console.log(JSON.stringify({seq:+process.argv[1],version:process.argv[2],sha256:process.argv[3],notes:process.argv[4]||''}))" "$SEQ" "${{ steps.v.outputs.ver }}" "$SHA" "$NOTES" > update.json
+          cat update.json
+      - name: 릴리스 만들기
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" app.asar update.json --title "ver${{ steps.v.outputs.ver }}" --notes-file RELEASE_NOTES.txt --latest
