@@ -307,7 +307,7 @@ function locInfo(w) {
 }
 function locBtn(w, cls) {
   const L = locInfo(w); if (!L) return '';
-  return `<button class="loc ${cls || ''} ${L.allMissing ? 'warn' : ''}" data-act="show-pdf" data-v="${L.primary.id}" title="${esc(L.full)}&#10;눌러서 폴더 열기">📁 <span>${esc(L.allMissing ? L.text + ' · 파일 없음' : L.text)}</span></button>`;
+  return `<button class="loc ${cls || ''} ${L.allMissing ? 'warn' : ''}" data-act="show-pdf" data-v="${L.primary.id}" title="${esc(L.full)}&#10;눌러서 폴더에서 보기">📁 <span>${esc(L.allMissing ? L.text + ' · 파일 없음' : L.text)}</span></button>`;
 }
 function resumeFile(w) {
   const fs = filesOf(w).filter((f) => !f.missing && f.lastPage > 0 && f.lastReadAt);
@@ -366,9 +366,9 @@ function renderDrawer() {
     <div class="sec"><h5>태그</h5><div class="tags" id="tags">${tagsHtml(w)}</div></div>
     <div class="sec"><h5>메모</h5><textarea data-f="note" placeholder="읽은 소감, 인용할 쪽, 참고할 점…">${esc(w.note)}</textarea></div>
     <div class="sec"><h5>위치</h5>${(locInfo(w) ? locInfo(w).list : []).map((g) => `
-      <div class="locrow"><button class="loc ${g.file.missing ? 'warn' : ''}" data-act="show-pdf" data-v="${g.file.id}" title="눌러서 폴더 열기">📁 <span>${esc(g.label)}</span></button>
+      <div class="locrow"><button class="loc ${g.file.missing ? 'warn' : ''}" data-act="show-pdf" data-v="${g.file.id}" title="눌러서 폴더에서 보기">📁 <span>${esc(g.label)}</span></button>
         <div class="path">${esc(g.dir)}</div>
-        <div class="btns"><button class="btn sm" data-act="show-pdf" data-v="${g.file.id}">폴더 열기</button><button class="btn sm" data-act="copy-path" data-v="${g.file.id}">경로 복사</button></div></div>`).join('')}</div>
+        <div class="btns"><button class="btn sm" data-act="show-pdf" data-v="${g.file.id}">폴더에서 보기</button><button class="btn sm" data-act="copy-path" data-v="${g.file.id}">경로 복사</button></div></div>`).join('')}</div>
     <div class="sec"><h5>PDF 파일 ${files.length}개</h5>${files.map((f) => `
       <div class="file ${f.missing ? 'gone' : ''}">
         <div class="fn"><b title="${esc(f.name)}">${esc(f.name)}</b><small title="${esc(f.path)}">${f.missing ? '파일 없음 · ' : ''}${fmtSize(f.size)}${/\.epub$/i.test(f.path) ? ` · EPUB${f.lastPage > 0 ? ` · ${Math.round(f.lastPage / 10)}% 읽음` : ''}` : f.pages > 0 ? ` · ${num(f.pages)}쪽${f.lastPage > 0 ? ` · ${f.lastPage}쪽까지 읽음` : ''}` : ''}</small></div>
@@ -657,7 +657,7 @@ document.addEventListener('click', async (e) => {
     case 'rm-tag': { const w = work(S.open); queueSave(w.id, { tags: w.tags.filter((_, i) => i !== +v) }); renderDrawer(); renderList(); break; }
     case 'read': if (window.TLReader) window.TLReader.open({ fileId: v }); break;
     case 'open-pdf': { const f = fileById(v); const r = D && await D.openPdf(f.path); if (!r || !r.ok) toast('파일을 열 수 없습니다. 이동되었거나 삭제되었을 수 있습니다.', true); break; }
-    case 'show-pdf': { const f = fileById(v); if (D && D.showInFolder) { const r = await D.showInFolder(f.path); if (r && !r.ok) toast('폴더를 찾을 수 없습니다. 이동되었거나 드라이브가 연결되어 있지 않을 수 있습니다.', true); else if (r && r.folderOnly) toast('파일은 없고 폴더만 열었습니다.'); } else { try { await navigator.clipboard.writeText(f.path); toast('이 환경에서는 폴더를 열 수 없어 경로를 복사했습니다.'); } catch {} } break; }
+    case 'show-pdf': { const f = fileById(v); if (D && D.showInFolder) { const r = await D.showInFolder(f.path); if (r && !r.ok) toast('폴더를 찾을 수 없습니다. 이동되었거나 드라이브가 연결되어 있지 않을 수 있습니다.', true); else if (r && r.folderOnly) toast('파일은 없어서 폴더만 보여 드립니다.'); } else { try { await navigator.clipboard.writeText(f.path); toast('이 환경에서는 폴더를 열 수 없어 경로를 복사했습니다.'); } catch {} } break; }
     case 'copy-path': { const f = fileById(v); try { await navigator.clipboard.writeText(dirOf(f.path).replace(/\//g, /^[A-Za-z]:/.test(f.path) ? '\\' : '/')); toast('폴더 경로를 복사했습니다.'); } catch { toast('복사하지 못했습니다.', true); } break; }
     case 'detach':
       try { setLib(await api(`/api/library/files/${encodeURIComponent(v)}/detach`, 'POST')); renderAll(); toast('별도 작품으로 분리했습니다.'); } catch (er) { toast(er.message, true); } break;
