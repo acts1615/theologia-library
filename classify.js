@@ -101,6 +101,7 @@ add('학위 논문', /학위\s*논문|박사\s*(?:학위)?\s*논문|석사\s*(?:
 add('학술지·저널', /학술지|저널|journal|신학지남|신학논단|논총|통권|제\s*\d+\s*(?:호|집)|\d{4}\s*(?:년)?\s*(?:봄|여름|가을|겨울)\s*호|kts|bulletin|review\s*of/i, 5, '학술지');
 add('연구 보고서', /연구\s*보고서|보고서|연구\s*자료|백서|통계|조사\s*(?:결과|보고)|현황/i, 4, '보고서');
 add('신학 논문', /논문(?![가-힣]*집\s*\()|article|paper/i, 3, '논문');
+add('신학 논문', /신학\s*정론/, 9, '신학정론');   // 신학정론(합동신학대학원 학술지)에 실린 글은 기본적으로 논문으로 본다
 // 교양·일반
 add('교회론', /성례|교회\s*(?:란|는|의\s*(?:본질|사명))|그리스도의\s*몸/, 4, '교회론');
 add('조직신학', /계약\s*신학|언약|신학\s*(?:세계|사상|입문|의\s*(?:이해|기초))|신학\s*개요|신학자/, 3, '신학');
@@ -138,6 +139,7 @@ const AUTHOR_HINT = [
 
 // ---- 폴더 이름 신호: 하위 폴더 이름이 제목보다 정확한 경우가 많다 ----
 const FOLDER = [
+  [/신학\s*정론/, '신학 논문'],
   [/만화|꿈나라|먼나라|용선생|체험학습|고우영|요코야마|이두호|풍운아\s*홍길동/, '만화·학습만화'],
   [/세계사|로마인\s*이야기|천추흥망|역사저널|펠로폰네소스|문화유산답사|한국사|중국역사/, '역사'],
   [/소설|삼국지|수호지|초한지|열국지|대망|해리포터|토지|장길산|젊은작가상|화산도|아리랑|태백산맥|정글만리|조정래|김하인|김성일|김연수|황정은|셜록홈즈|코난|마스터스\s*오브\s*로마|클레오파트라|몬테크리스토|위키드|에덴의\s*동쪽|개미|제3인류|제3의\s*눈|1Q84|기사단장|실낙원|장미의\s*이름|사과나무|신점|잃어버린\s*너|아침인사|가슴에\s*새긴|목련꽃|국화꽃향기|데미안|대지_|단테\s*신곡|돈키호테|변신이야기|꼭\s*읽어야할/, '소설'],
@@ -175,8 +177,9 @@ function classify({ title, author, extra, dirs }) {
   const dl = dl0;
   const sub = dl.slice(1).join('/');
   let folderCat = '';
-  if (sub) { for (const [re, cat] of FOLDER) if (re.test(sub)) { folderCat = cat; break; } }
-  if (folderCat) bump(folderCat, 8, '폴더 ' + dl[dl.length - 1]);
+  let folderSeg = '';
+  if (sub) { for (const [re, cat] of FOLDER) if (re.test(sub)) { folderCat = cat; folderSeg = dl.slice(1).find((x) => re.test(x)) || dl[dl.length - 1]; break; } }
+  if (folderCat) bump(folderCat, 8, '폴더 ' + folderSeg);
   if (generalRoot) for (const [c, v] of score) if (!GENERAL.has(c)) { score.set(c, v * THEO_DAMP); }
   if (generalRoot && !folderCat && sub && /올재/.test(sub)) bump('동양 고전', 2, '폴더 올재');
   if (author) for (const [re, cat, w] of AUTHOR_HINT) if (re.test(String(author))) bump(cat, w, '저자');

@@ -247,7 +247,7 @@ function createStore(dataDir) {
   }
   function filesOfWork(wid) { return state.files.filter((f) => f.workId === wid); }
   // 자동 분류: 사용자가 직접 지정한 값(classSource/bibleSource === 'manual')은 건드리지 않는다.
-  const CLS_VER = 5;
+  const CLS_VER = 6;
   function classifyAll(opts = {}) {
     let changed = 0, cat = 0, bible = 0;
     const byWork = new Map(); for (const f of state.files) { let a = byWork.get(f.workId); if (!a) byWork.set(f.workId, (a = [])); a.push(f.name); }
