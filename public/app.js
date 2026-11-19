@@ -264,6 +264,7 @@ function renderList() {
       <button class="btn sm" data-act="bulk-status" data-v="unread">읽을 예정으로</button>
       <button class="btn sm" data-act="bulk-status" data-v="reading">읽는 중으로</button>
       <button class="btn sm" data-act="bulk-status" data-v="finished">완독으로</button>
+      <button class="btn sm" data-act="bulk-cat">분류 바꾸기…</button>
       <button class="btn sm" data-act="uncheck">선택 해제</button>
       <span style="color:var(--muted);font-size:12.5px">${S.checked.size < 2 ? '합치려면 2개 이상 선택하세요' : '같은 책의 분할 PDF를 하나로 묶습니다'}</span>`;
   } else sb.hidden = true;
@@ -271,6 +272,7 @@ function renderList() {
   if (!S.lib.works.length) {
     c.innerHTML = `<div class="empty"><div class="big">서재를 시작해 볼까요?</div>
       <p>PDF가 들어 있는 폴더를 연결하면 하위 폴더까지 찾아서, 같은 책의 분할 파일을 하나의 작품으로 묶어 줍니다.<br>파일은 원래 위치에 그대로 두고, 경로와 정리 내용만 이 서재에 기록합니다.</p>
+      <ol class="first-steps"><li><b>폴더 연결</b> — 책이 들어 있는 폴더를 고르면 PDF·EPUB를 찾아 작품으로 묶습니다.</li><li><b>자동 분류 확인</b> — 이름으로 분류합니다. 왼쪽 ‘분류 확인 필요’에서 틀린 것을 고쳐 주세요. 여러 권을 선택하면 한꺼번에 바꿀 수 있습니다.</li><li><b>서점 정보 채우기</b> — 설정에 카카오 키를 넣으면 표지와 저자를 채웁니다. 키가 없어도 서재는 쓸 수 있습니다.</li><li><b>백업</b> — 설정의 ‘백업 파일 만들기’로 분류와 메모를 가끔 저장해 두세요.</li></ol>
       ${D ? '<button class="btn primary" data-act="add-folder">＋ 폴더 연결</button>' : '<p style="color:var(--danger)">폴더 연결은 Theologia Library 데스크톱 앱에서만 사용할 수 있습니다.</p>'}</div>`;
     return;
   }
@@ -518,7 +520,11 @@ async function settingsModal() {
     <div class="field" style="grid-template-columns:110px 1fr;margin-top:14px"><label>본문 검색 색인</label><input id="k-index" type="text" value="${esc(S.settings.searchIndex || '')}" placeholder="비워 두면 PDF 폴더 옆 _서재색인을 자동으로 찾습니다"></div>
     <p class="help" style="margin:2px 0 0 120px">${sxLine}<br>다른 곳에 둔 색인을 쓰려면 서재색인.db 파일 또는 그것이 든 폴더의 경로를 적으세요. 색인은 읽기만 하며 바꾸지 않습니다. 책 짝은 폴더 기준 경로로 찾고, 안 맞으면 파일 이름과 크기로 찾습니다.</p>
 ${fillStatsHtml()}
-    <p class="help" style="margin-top:14px">키가 없어도 서재는 모두 쓸 수 있습니다. 교보문고는 검색 페이지 링크만 제공합니다.</p><p class="help" style="margin-top:6px;color:#8a8e84">앱 버전 ver${esc(S.settings.version || '')} · ${esc(S.settings.build || '확인 안 됨(오래된 버전)')} <button class="btn sm" id="upd-check" style="margin-left:8px">업데이트 확인</button> <span id="upd-msg"></span></p><p class="help" style="margin-top:6px;color:#8a8e84">제작: 좋은군사 · MIT 라이선스 · <a href="https://github.com/acts1615/theologia-library" target="_blank" rel="noopener">github.com/acts1615/theologia-library</a></p>`,
+    <h5 style="margin:18px 0 6px">백업과 되돌리기</h5>
+    <p class="help">분류·메모·읽은 위치 같은 서재 기록을 파일 하나로 저장합니다. 책 파일(PDF·EPUB)은 들어 있지 않고, API 키도 담기지 않습니다. 다른 컴퓨터로 옮길 때도 이 파일을 쓰면 됩니다.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><a class="btn sm" id="bk-export" href="/api/backup/export" download>백업 파일 만들기</a><button class="btn sm" id="bk-import" type="button">백업에서 되돌리기…</button><input type="file" id="bk-file" accept=".json,application/json" hidden></div>
+    <p class="help" style="margin-top:6px;color:#8a8e84">서재 기록 위치: ${esc(S.settings.dataDir || '')}</p>
+    <p class="help" style="margin-top:14px">키가 없어도 서재는 모두 쓸 수 있습니다. 교보문고는 검색 페이지 링크만 제공합니다.</p><p class="help" style="margin-top:6px;color:#8a8e84">앱 버전 ver${esc(S.settings.version || '')} · ${esc(S.settings.build || '확인 안 됨(오래된 버전)')} <button class="btn sm" id="upd-check" style="margin-left:8px">업데이트 확인</button> <span id="upd-msg"></span></p><p class="help" style="margin-top:6px;color:#8a8e84">제작: 좋은군사 · MIT 라이선스 · <a href="https://github.com/acts1615/theologia-library" target="_blank" rel="noopener">github.com/acts1615/theologia-library</a> · <a href="https://github.com/acts1615/theologia-library/issues" target="_blank" rel="noopener">문제 알리기</a></p>`,
     [{ label: '닫기' }, { label: '자동 분류 다시 실행', fn: async () => { busy('분류하는 중…'); try { const r = await api('/api/library/classify', 'POST', { force: true }); setLib(r.library); renderAll(); renderSide(); toast(`자동 분류를 다시 실행했습니다. 분류 ${num(r.cat)}권, 성경 연결 ${num(r.bible)}권 (직접 지정한 값은 그대로 두었습니다).`); } catch (e) { toast(e.message, true); } finally { busy(''); } } }, { label: '서점 정보 자동 채우기', fn: async (m) => { const k = m.querySelector('#k-kakao').value; if (k) { try { S.settings = await api('/api/settings', 'PUT', { KAKAO_REST_API_KEY: k }); } catch (e) { toast(e.message, true); return true; } } if (!S.settings.kakao) { toast('먼저 카카오 REST API 키를 입력해 주세요.', true); return true; } setTimeout(() => autoFillAll(true), 200); } }, { label: '저장', cls: 'primary', fn: async (m) => {
       const body = {}; const k = m.querySelector('#k-kakao').value;
       if (k) body.KAKAO_REST_API_KEY = k;
@@ -635,6 +641,13 @@ document.addEventListener('click', async (e) => {
     case 'view': S.view = v; try { localStorage.setItem('tl.view', v); } catch (e) {} renderList(); break;
     case 'toggle-list': { e.stopPropagation(); const w = work(v); if (w) { queueSave(w.id, { inList: !w.inList }); renderList(); if (S.open === w.id) renderDrawer(); toast(w.inList ? '읽기 목록에 넣었습니다.' : '읽기 목록에서 뺐습니다.'); } break; }
     case 'bulk-list': { const on = v === '1'; for (const id of S.checked) queueSave(id, { inList: on }); toast(`${S.checked.size}권을 읽기 목록${on ? '에 넣었습니다' : '에서 뺐습니다. (읽는 중·읽을 예정 같은 읽기 상태는 그대로입니다)'}.`); S.checked.clear(); renderList(); renderSide(); break; }
+    case 'bulk-cat': {
+      const ids = [...S.checked]; if (!ids.length) break;
+      const names = [...new Set([...S.ref.categories.map((c) => c.name), ...S.lib.works.map((x) => x.category).filter(Boolean)])].sort((a, b) => a.localeCompare(b, 'ko'));
+      modal('분류 바꾸기', `<p>선택한 ${num(ids.length)}권의 분류를 한꺼번에 바꿉니다.</p><div class="field" style="grid-template-columns:70px 1fr"><label>분류</label><input id="bc-in" list="bc-list" placeholder="목록에서 고르거나 직접 입력" autocomplete="off"><datalist id="bc-list">${names.map((c) => `<option value="${esc(c)}">`).join('')}</datalist></div><p class="help">직접 지정한 분류는 자동 분류를 다시 돌려도 바뀌지 않습니다. 비워 두고 누르면 분류를 지웁니다.</p>`,
+        [{ label: '취소' }, { label: '바꾸기', cls: 'primary', fn: (m) => { const v = m.querySelector('#bc-in').value.trim(); for (const id of ids) queueSave(id, { category: v }); toast(`${num(ids.length)}권의 분류를 ${v ? `'${v}'(으)로` : '비우는 것으로'} 바꿨습니다.`); S.checked.clear(); renderList(); renderSide(); } }]);
+      break;
+    }
     case 'bulk-status': { const n = S.checked.size; const label = { unread: '읽을 예정', reading: '읽는 중', finished: '완독' }[v]; for (const id of S.checked) queueSave(id, { status: v }); toast(`${n}권을 '${label}'(으)로 옮겼습니다.`); S.checked.clear(); renderList(); renderSide(); break; }
     case 'save-now': { clearTimeout(saveTimer); if (pending.size) { setSave('저장 중…'); await flushSave(); } else setSave('저장됨'); if (S.saveState === '저장됨') toast('저장했습니다.'); break; }
     case 'fill-stop': await api('/api/library/autofill/stop', 'POST', {}); toast('중지합니다. 지금까지 가져온 정보는 그대로 저장됩니다.'); break;
@@ -741,6 +754,7 @@ async function startUpdate(c) {
   } catch { show('앱이 다시 시작되는 중입니다…', 1); }   // 앱이 닫히면서 연결이 끊긴 경우
 }
 document.addEventListener('click', async (e) => {
+  const bi = e.target.closest('#bk-import'); if (bi) { const f = document.getElementById('bk-file'); if (f) f.click(); return; }
   const b = e.target.closest('#upd-check'); if (!b) return; b.disabled = true; const msg = document.getElementById('upd-msg'); if (msg) msg.textContent = '확인하는 중…';
   const c = await checkUpdate(true); b.disabled = false;
   if (msg) msg.textContent = c.error ? c.error : c.available ? `새 버전 ver${c.latest.version}이 있습니다. 왼쪽 아래에서 업데이트하세요.` : '최신 버전입니다.';
@@ -758,4 +772,19 @@ document.addEventListener('click', async (e) => {
   setTimeout(() => checkUpdate(false, true), 4000);
   syncFill().then(() => { if (fillJob.running && !fillPoll) fillPoll = setInterval(() => syncFill(), 2500); });
 })();
+
+// ---------- 백업에서 되돌리기 ----------
+document.addEventListener('change', async (e) => {
+  const f = e.target; if (!f || f.id !== 'bk-file' || !f.files || !f.files[0]) return;
+  const file = f.files[0]; let obj;
+  try { obj = JSON.parse(await file.text()); } catch { toast('백업 파일을 읽지 못했습니다. 올바른 파일인지 확인해 주세요.', true); return; }
+  const n = obj && obj.library && Array.isArray(obj.library.works) ? obj.library.works.length : -1;
+  if (!obj || obj.app !== 'theologia-library' || n < 0) { toast('이 앱에서 만든 백업 파일이 아닙니다.', true); return; }
+  modal('백업에서 되돌리기', `<p>“${esc(file.name)}”의 서재 기록(작품 ${num(n)}권)으로 되돌릴까요?</p><p class="help">지금의 기록은 데이터 폴더에 <b>library.before-restore.json</b>으로 한 번 남겨 둡니다. 책 파일은 건드리지 않습니다.</p>`,
+    [{ label: '취소' }, { label: '되돌리기', cls: 'primary', fn: async () => {
+      busy('되돌리는 중…');
+      try { const r = await api('/api/backup/import', 'POST', obj); setLib(r.library); S.checked.clear(); S.open = null; renderAll(); renderSide(); toast(`백업에서 되돌렸습니다. 작품 ${num(r.library.works.length)}권.`); }
+      catch (err) { toast(err.message, true); } finally { busy(''); }
+    } }]);
+});
 })();

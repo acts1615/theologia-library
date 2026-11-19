@@ -30,7 +30,7 @@ function createSettings(dataDir, extraDirs = []) {
   const apply = (obj) => { for (const k of KEYS) if (obj && typeof obj[k] === 'string' && obj[k].trim()) process.env[k] = obj[k].trim(); };
   for (const d of [...extraDirs, dataDir]) { try { apply(JSON.parse(fs.readFileSync(path.join(d, 'settings.json'), 'utf8'))); } catch {} }
   return {
-    status: () => ({ build: (() => { try { return require('./build.json').build; } catch { return ''; } })(), version: versionOf((() => { try { return require('./build.json').seq; } catch { return 0; } })()), kakao: !!process.env.KAKAO_REST_API_KEY, nl: !!process.env.NL_CERT_KEY, searchIndex: process.env.SEARCH_INDEX_PATH || '' }),
+    status: () => ({ dataDir, build: (() => { try { return require('./build.json').build; } catch { return ''; } })(), version: versionOf((() => { try { return require('./build.json').seq; } catch { return 0; } })()), kakao: !!process.env.KAKAO_REST_API_KEY, nl: !!process.env.NL_CERT_KEY, searchIndex: process.env.SEARCH_INDEX_PATH || '' }),
     save(input) {
       let cur = {}; try { cur = JSON.parse(fs.readFileSync(file, 'utf8')); } catch {}
       for (const k of KEYS) if (typeof input[k] === 'string') {
@@ -277,6 +277,19 @@ function createServer({ publicDir, dataDir, settingsDirs = [], restart = null })
       }
       if (p === '/api/update/apply' && m === 'POST') { try { return sendJson(res, 200, await updater.apply()); } catch (e) { return sendJson(res, 200, { state: 'error', error: String((e && e.message) || e) }); } }
       if (p === '/api/update/status' && m === 'GET') return sendJson(res, 200, updater.status());
+      if (p === '/api/backup/export' && m === 'GET') {
+        store.flush();
+        const d = new Date(), z = (n) => String(n).padStart(2, '0');
+        const name = `theologia-backup-${d.getFullYear()}${z(d.getMonth() + 1)}${z(d.getDate())}-${z(d.getHours())}${z(d.getMinutes())}.json`;
+        const body = JSON.stringify({ app: 'theologia-library', exportedAt: d.toISOString(), build: (() => { try { return require('./build.json').build; } catch { return ''; } })(), library: store.raw() });
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Content-Disposition': `attachment; filename="${name}"`, 'Cache-Control': 'no-store' });
+        return res.end(body);
+      }
+      if (p === '/api/backup/import' && m === 'POST') {
+        const b = await readBody(req);
+        if (!b || b.app !== 'theologia-library' || !b.library) return sendJson(res, 400, { error: '이 앱의 백업 파일이 아닙니다.' });
+        try { return sendJson(res, 200, { library: store.restore(b.library) }); } catch (e) { return sendJson(res, 400, { error: e.message }); }
+      }
       if (p === '/api/settings' && m === 'GET') return sendJson(res, 200, settings.status());
       if (p === '/api/settings' && m === 'PUT') { settings.save(await readBody(req)); return sendJson(res, 200, settings.status()); }
 

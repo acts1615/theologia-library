@@ -294,9 +294,18 @@ function createStore(dataDir) {
     touch(); return w;
   }
   function confirmClass(wid) { const w = workById(wid); if (!w) return null; w.classSource = 'manual'; w.classConf = ''; touch(); return w; }
+  function raw() { return state; }
+  function restore(obj) {
+    if (!obj || obj.version !== VERSION || !Array.isArray(obj.works) || !Array.isArray(obj.files) || !Array.isArray(obj.folders)) throw new Error('이 앱의 백업 파일이 아니거나 버전이 맞지 않습니다.');
+    flush();
+    try { if (fs.existsSync(file)) fs.copyFileSync(file, path.join(dataDir, 'library.before-restore.json')); } catch {}
+    state = { version: VERSION, nextId: Math.max(+obj.nextId || 1, 1), folders: obj.folders, works: obj.works, files: obj.files };
+    dirty = true; flush();
+    return snapshot();
+  }
   function snapshot() { return { version: VERSION, folders: state.folders, works: state.works, files: state.files }; }
 
-  return { fileById, setFilePages, setFileProgress, setFileMarks, scan, updateWork, mergeWorks, detachFile, moveFile, deleteWork, removeFolder, applyCandidate, fillEmpty, markSkip, classifyAll, confirmClass, filesOfWork, snapshot, flush, workById };
+  return { fileById, setFilePages, setFileProgress, setFileMarks, scan, updateWork, mergeWorks, detachFile, moveFile, deleteWork, removeFolder, applyCandidate, fillEmpty, markSkip, classifyAll, confirmClass, filesOfWork, snapshot, raw, restore, flush, workById };
 }
 
 module.exports = { createStore };
