@@ -1,0 +1,26 @@
+# Actions 탭 → installer → Run workflow : 윈도우 설치 프로그램(Setup.exe)을 만들어 최신 릴리스에 붙입니다.
+# 릴리스가 아직 없으면 Actions 실행 결과(Artifacts)로 내려받을 수 있습니다.
+name: installer
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  win:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci --omit=dev --no-audit --no-fund
+      - run: npx --yes electron-builder@25 --win nsis --x64 --publish never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Theologia-Library-Setup
+          path: dist/Theologia-Library-Setup.exe
+      - name: 최신 릴리스에 붙이기
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$(gh release view --json tagName -q .tagName)" dist/Theologia-Library-Setup.exe --clobber || echo "릴리스가 없어 Artifacts 로만 올렸습니다."

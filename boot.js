@@ -37,6 +37,7 @@ process.on('unhandledRejection', (e) => fatal('처리되지 않은 오류', e));
 function updatesDir() {
   const { app } = require('electron');
   if (process.platform === 'darwin') return path.join(app.getPath('appData'), 'Theologia Library', 'data', 'updates');
+  if (fs.existsSync(path.join(path.dirname(process.execPath), 'Uninstall Theologia Library.exe'))) return path.join(app.getPath('appData'), 'Theologia Library', 'data', 'updates');
   const portable = path.join(path.dirname(process.execPath), 'data');
   try { fs.mkdirSync(portable, { recursive: true }); fs.accessSync(portable, fs.constants.W_OK); return path.join(portable, 'updates'); }
   catch { return path.join(app.getPath('appData'), 'Theologia Library', 'data', 'updates'); }

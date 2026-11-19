@@ -1,17 +1,46 @@
 {
   "name": "theologia-library",
   "productName": "Theologia Library",
-  "version": "1.0.1",
+  "version": "1.0.0",
   "description": "흩어진 신학 문헌을 작품과 파일의 맥락으로 관리하는 개인 서재",
   "main": "boot.js",
-  "license": "MIT",
+  "license": "UNLICENSED",
   "dependencies": {
     "fast-xml-parser": "^5.12.1",
     "fflate": "^0.8.3"
   },
   "author": "좋은군사",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/acts1615/theologia-library.git"
+  "build": {
+    "appId": "kr.goodsoldier.theologia",
+    "productName": "Theologia Library",
+    "electronVersion": "45.3.2",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "**/*",
+      "!dist/**",
+      "!.git/**",
+      "!.github/**"
+    ],
+    "asar": true,
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "language": "1042",
+      "createDesktopShortcut": true,
+      "artifactName": "Theologia-Library-Setup.${ext}"
+    }
   }
 }

@@ -16,6 +16,8 @@ const EXE_DIR = path.dirname(process.execPath);
 function resolveDataDir() {
   // 맥: 앱 번들 안은 쓰면 서명이 깨지므로 항상 사용자 폴더(~/Library/Application Support)를 씁니다.
   if (process.platform === 'darwin') return path.join(app.getPath('appData'), 'Theologia Library', 'data');
+  // 설치형(설치 프로그램으로 깔린 경우): 제거·재설치해도 서재가 남도록 사용자 폴더를 쓴다.
+  if (fs.existsSync(path.join(EXE_DIR, 'Uninstall Theologia Library.exe'))) return path.join(app.getPath('appData'), 'Theologia Library', 'data');
   const portable = path.join(EXE_DIR, 'data');
   try { fs.mkdirSync(portable, { recursive: true }); fs.accessSync(portable, fs.constants.W_OK); return portable; }
   catch { return path.join(app.getPath('appData'), 'Theologia Library', 'data'); }
