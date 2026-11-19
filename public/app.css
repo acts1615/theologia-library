@@ -308,3 +308,7 @@ body.side-off .side{display:none}
 .locrow .btns{display:flex;gap:6px;margin-top:6px}
 
 .open-gone{margin:0 0 12px;padding:8px 12px;border-radius:8px;background:#f5e9c8;color:#7a5a12;font-size:13px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+
+body.side-off .upd{display:none}
+.upd.busy{gap:6px}.upd.err{border-color:#e0b4a8;background:#fff6f3}
+.upd-bar{height:6px;border-radius:4px;background:#0000001a;overflow:hidden}.upd-bar i{display:block;height:100%;background:var(--olive,#6d7b5a);transition:width .3s}

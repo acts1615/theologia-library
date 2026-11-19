@@ -133,7 +133,7 @@ function renderSide() {
     for (const b of x.bibleBooks || []) bcount.set(b, (bcount.get(b) || 0) + 1);
   }
   const nav = (id, label, n, warn) => `<button class="nav ${S.nav === id && !S.category ? 'on' : ''} ${warn && n ? 'warn' : ''}" data-act="nav" data-v="${id}"><span>${label}</span><span class="n">${num(n)}</span></button>`;
-  const GEN = new Set(['소설', '시·에세이', '동양 고전', '서양 고전·철학', '역사', '만화·학습만화', '과학·교양', '인문·사회', '자기계발']);
+  const GEN = new Set(['영어', '개발·IT', '수험서', '소설', '시·에세이', '동양 고전', '서양 고전·철학', '역사', '만화·학습만화', '과학·교양', '인문·사회', '자기계발']);
   const catBtn = ([c, n]) => `<button class="nav ${S.category === c ? 'on' : ''}" data-act="cat" data-v="${esc(c)}"><span>${esc(c)}</span><span class="n">${num(n)}</span></button>`;
   const catSorted = [...cats.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'ko'));
   const catGen = catSorted.filter(([c]) => GEN.has(c)), catTheo = catSorted.filter(([c]) => !GEN.has(c));
@@ -711,31 +711,34 @@ window.TL = {
 };
 
 // ---------- 시작 ----------
-// ---------- 온라인 업데이트 ----------
+// ---------- 온라인 업데이트 (알림·진행 모두 사이드바 안에서) ----------
+function updCard(html, cls) {
+  let el = document.querySelector('.upd');
+  if (!el) { el = document.createElement('div'); el.className = 'upd'; document.body.appendChild(el); }
+  el.className = 'upd ' + (cls || ''); el.innerHTML = html; return el;
+}
 async function checkUpdate(force, quiet) {
   let c; try { c = await api('/api/update/check' + (force ? '?force=1' : '')); } catch { c = { available: false, error: '확인하지 못했습니다.' }; }
+  if (S.updating) return c;
   document.querySelector('.upd')?.remove();
   if (c.available && c.latest) {
-    const el = document.createElement('div'); el.className = 'upd';
-    el.innerHTML = `<b>새 버전 ver${esc(c.latest.version)}</b><small>지금 쓰는 버전은 ver${esc((c.current || {}).version || '')}입니다.</small><div><button class="btn sm primary" data-upd="go">업데이트</button><button class="btn sm" data-upd="later">나중에</button></div>`;
-    el.addEventListener('click', (e) => { const b = e.target.closest('[data-upd]'); if (!b) return; if (b.dataset.upd === 'later') el.remove(); else startUpdate(c); });
-    document.body.appendChild(el);
+    const el = updCard(`<b>새 버전 ver${esc(c.latest.version)}</b><small>지금은 ver${esc((c.current || {}).version || '')}${c.latest.notes ? ' · ' + esc(c.latest.notes.split('\n')[0].slice(0, 60)) : ''}</small><div><button class="btn sm primary" data-upd="go">업데이트</button><button class="btn sm" data-upd="later">나중에</button></div>`);
+    el.onclick = (e) => { const b = e.target.closest('[data-upd]'); if (!b) return; if (b.dataset.upd === 'later') el.remove(); else startUpdate(c); };
   }
   return c;
 }
-function startUpdate(c) {
-  const notes = (c.latest.notes || '').trim();
-  modal('업데이트', `<p>ver${esc((c.current || {}).version || '')} → <b>ver${esc(c.latest.version)}</b> (${(c.latest.size / 1048576).toFixed(1)} MB)</p>${notes ? `<p class="help" style="white-space:pre-wrap">${esc(notes)}</p>` : ''}<p class="help">내려받은 뒤 앱이 자동으로 닫혔다가 다시 열립니다. 서재 기록과 설정은 그대로 유지됩니다.${c.canRestart ? '' : ' (이 환경에서는 직접 다시 시작해야 합니다.)'}</p>`,
-    [{ label: '취소' }, { label: '업데이트하고 다시 시작', cls: 'primary', fn: async () => {
-      busy('업데이트를 내려받는 중…'); closeModal();
-      try {
-        let st = await api('/api/update/apply', 'POST', {});
-        while (st.state === 'downloading') { await new Promise((r) => setTimeout(r, 700)); st = await api('/api/update/status'); busy(`업데이트를 내려받는 중… ${Math.round((st.progress || 0) * 100)}%`); }
-        if (st.state === 'ready') { busy(c.canRestart ? '다시 시작하는 중…' : '내려받았습니다. 앱을 끄고 다시 실행해 주세요.'); return; }
-        busy(''); toast(st.error || '업데이트하지 못했습니다.');
-      } catch { busy('다시 시작하는 중…'); }   // 앱이 닫히면서 연결이 끊긴 경우
-      return false;
-    } }]);
+async function startUpdate(c) {
+  S.updating = true; const ver = esc(c.latest.version);
+  const show = (msg, pct) => updCard(`<b>ver${ver} 업데이트</b><small>${msg}</small>${pct != null ? `<div class="upd-bar"><i style="width:${Math.round(pct * 100)}%"></i></div>` : ''}`, 'busy');
+  show('내려받는 중…', 0);
+  try {
+    let st = await api('/api/update/apply', 'POST', {});
+    while (st.state === 'downloading') { await new Promise((r) => setTimeout(r, 600)); st = await api('/api/update/status'); show(`내려받는 중… ${Math.round((st.progress || 0) * 100)}%`, st.progress || 0); }
+    if (st.state === 'ready') { show(c.canRestart ? '잠시 후 앱이 다시 시작됩니다.' : '내려받았습니다. 앱을 끄고 다시 실행해 주세요.', 1); return; }
+    S.updating = false;
+    const el = updCard(`<b>업데이트하지 못했습니다</b><small>${esc(st.error || '잠시 후 다시 시도해 주세요.')}</small><div><button class="btn sm primary" data-upd="go">다시 시도</button><button class="btn sm" data-upd="later">닫기</button></div>`, 'err');
+    el.onclick = (e) => { const b = e.target.closest('[data-upd]'); if (!b) return; if (b.dataset.upd === 'later') el.remove(); else startUpdate(c); };
+  } catch { show('앱이 다시 시작되는 중입니다…', 1); }   // 앱이 닫히면서 연결이 끊긴 경우
 }
 document.addEventListener('click', async (e) => {
   const b = e.target.closest('#upd-check'); if (!b) return; b.disabled = true; const msg = document.getElementById('upd-msg'); if (msg) msg.textContent = '확인하는 중…';
