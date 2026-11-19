@@ -274,13 +274,22 @@ function renderList() {
       ${D ? '<button class="btn primary" data-act="add-folder">＋ 폴더 연결</button>' : '<p style="color:var(--danger)">폴더 연결은 Theologia Library 데스크톱 앱에서만 사용할 수 있습니다.</p>'}</div>`;
     return;
   }
-  if (!list.length) { c.innerHTML = '<div class="empty"><div class="big">조건에 맞는 문헌이 없습니다</div><p>검색어나 필터를 바꿔 보세요.</p></div>'; return; }
+  const openIdx = S.open ? list.findIndex((w) => w.id === S.open) : -1;
+  const openGone = S.open && openIdx < 0 && work(S.open) ? `<div class="open-gone">수정 중인 「${esc(work(S.open).title)}」이(가) 지금 보는 목록의 조건에서 빠졌습니다. <button class="btn sm" data-act="nav" data-v="all">전체 문헌 보기</button></div>` : '';
+  if (!list.length) { S.openPos = null; c.innerHTML = openGone + '<div class="empty"><div class="big">조건에 맞는 문헌이 없습니다</div><p>검색어나 필터를 바꿔 보세요.</p></div>'; return; }
+  // 수정 중인 책(오른쪽에 열린 책)이 정렬·검색 때문에 밀려나도 목록에서 계속 보이게 한다
+  if (openIdx >= S.limit) S.limit = openIdx + 1;
   const shown = list.slice(0, S.limit);
-  c.innerHTML = (S.view === 'list'
+  c.innerHTML = openGone + (S.view === 'list'
     ? `<table class="ltable"><thead><tr><th></th><th></th><th>제목</th><th>저자</th><th>분류</th><th>상태</th><th>진행</th><th>PDF</th><th></th></tr></thead><tbody>${shown.map(row).join('')}</tbody></table>`
     : `<div class="grid ${S.checked.size ? 'sel-mode' : ''}">${shown.map(card).join('')}</div>`) + `
     ${list.length > shown.length ? `<button class="btn more" data-act="more">더 보기 (${num(list.length - shown.length)}개 남음)</button>` : ''}`;
   document.querySelectorAll('.viewseg button').forEach((b) => b.classList.toggle('on', b.dataset.v === S.view));
+  const prev = S.openPos; S.openPos = S.open ? { id: S.open, idx: openIdx } : null;
+  if (S.open && openIdx >= 0 && prev && prev.id === S.open && prev.idx !== openIdx) {     // 같은 책인데 순서가 바뀐 경우에만 따라가 준다
+    const el = c.querySelector(`[data-act="open"][data-v="${CSS.escape(S.open)}"]`);
+    if (el) { const r = el.getBoundingClientRect(), cr = c.getBoundingClientRect(); if (r.top < cr.top + 4 || r.bottom > cr.bottom - 4) el.scrollIntoView({ block: 'center' }); }
+  }
 }
 
 function ago(iso) {

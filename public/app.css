@@ -306,3 +306,5 @@ body.side-off .side{display:none}
 .locrow .loc{font-size:12.5px;margin:0}
 .locrow .path{margin:4px 0 0;font-family:var(--font-mono,ui-monospace,monospace);font-size:11.5px;color:var(--muted);word-break:break-all}
 .locrow .btns{display:flex;gap:6px;margin-top:6px}
+
+.open-gone{margin:0 0 12px;padding:8px 12px;border-radius:8px;background:#f5e9c8;color:#7a5a12;font-size:13px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
