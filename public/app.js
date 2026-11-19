@@ -421,7 +421,7 @@ function modal(title, bodyHtml, buttons, onMount) {
   m.addEventListener('click', async (e) => {
     const t = e.target.closest('[data-m]'); if (!t) return;
     if (t.dataset.m === 'close') return closeModal();
-    const b = buttons[+t.dataset.m]; if (b && b.fn) { const keep = await b.fn(m); if (!keep) closeModal(); }
+    const b = buttons[+t.dataset.m]; if (!b) return; const keep = b.fn ? await b.fn(m) : false; if (!keep) closeModal();
   });
   document.body.appendChild(m); if (onMount) onMount(m); return m;
 }
