@@ -265,6 +265,10 @@ function createStore(dataDir) {
       return [root, ...rel.filter(Boolean)];
     };
     for (const w of state.works) {
+      if (!w.seriesTagged) {   // 시리즈 이름(올재·WBC·LAB·HOW·EM·BST)을 태그로 한 번만 붙인다. 지운 태그는 다시 붙이지 않는다.
+        const st = L.seriesTags(w.title, byWork.get(w.id) || []); w.seriesTagged = true; changed++;
+        if (st.length) w.tags = [...new Set([...(w.tags || []), ...st])];
+      }
       if (!opts.force && w.classVer === CLS_VER) continue;
       if (w.category && !w.classSource) w.classSource = 'manual';
       if (w.bibleBooks && w.bibleBooks.length && !w.bibleSource) w.bibleSource = 'manual';

@@ -515,7 +515,22 @@ function fileHint(fileNames, fallbackTitle) {
   return out;
 }
 // 시리즈 약칭 규칙: EM = 엑스포지멘터리(송병현). 송병현 저작은 모두 이 시리즈로 본다.
-const SERIES = [{ re: /^\s*EM(?=\s|$|\d)\s*/i, name: "엑스포지멘터리", author: "송병현" }];
+const SERIES = [{ re: /^\s*EM(?=\s|$|\d)(?!\s*[_\-]?\s*(?:바운즈|바운드|bounds))\s*/i, name: "엑스포지멘터리", author: "송병현" }];
+// 파일 이름 앞의 시리즈 표시를 태그 이름으로 바꾼다(올재, WBC, LAB, HOW, EM, BST). E.M 바운즈는 EM 이 아니다.
+const SERIES_TAGS = [
+  ["올재", /^\s*올재(?:클래식(?:스)?)?\s*[_\- ]/],
+  ["WBC", /(?:^|[^a-z])WBC(?![a-z])/i],
+  ["LAB", /^\s*LAB(?=[\s_]|$)/i],
+  ["HOW", /^\s*HOW(?=[\s_]|$)(?!\s*to\b)/i],
+  ["EM", /^\s*EM(?=\s|$|\d|_)(?!\s*[_\-]?\s*(?:바운즈|바운드|bounds))/i],
+  ["BST", /(?:^|[^a-z])BST(?![a-z])/i],
+];
+function seriesTags(title, fileNames) {
+  const out = [];
+  const cands = [String(title || ""), ...(fileNames || []).map((n) => String(n || "").normalize("NFC").replace(/\.(?:pdf|epub)$/i, ""))];
+  for (const [tag, re] of SERIES_TAGS) if (cands.some((t) => re.test(t.normalize("NFC")))) out.push(tag);
+  return out;
+}
 function seriesHints(title, fileNames, base) {
   const out = [];
   const names = [String(title || ""), ...(fileNames || []).map((n) => String(n).replace(/\.(?:pdf|epub)$/i, ""))];
@@ -616,4 +631,4 @@ function pickMatchHint(hint, candidates) {
   return best ? { cand: best.c, score: best.sc } : null;
 }
 
-module.exports = { parseTocText, normIsbn, findIsbns, lookupIsbn, magazineInfo, commentaryHints, pickMatchSeries, seriesHints, parseFileName, fileHint, pickMatchHint,  titleScore, matchScore, cleanForSearch, queryVariants, pickMatch,  canonName, searchBookstores, bibleSeed, categorySeed, groupPdfFiles, inferDocumentType, normalized, displayTitle, extractPartNumber };
+module.exports = { seriesTags, parseTocText, normIsbn, findIsbns, lookupIsbn, magazineInfo, commentaryHints, pickMatchSeries, seriesHints, parseFileName, fileHint, pickMatchHint,  titleScore, matchScore, cleanForSearch, queryVariants, pickMatch,  canonName, searchBookstores, bibleSeed, categorySeed, groupPdfFiles, inferDocumentType, normalized, displayTitle, extractPartNumber };
