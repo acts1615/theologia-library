@@ -33,22 +33,18 @@ if (!app.requestSingleInstanceLock()) { app.quit(); }
 app.on('second-instance', () => { if (mainWindow) { if (mainWindow.isMinimized()) mainWindow.restore(); mainWindow.focus(); } });
 
 // ---- 바탕화면 바로가기 --------------------------------------------------
-// 이 PC에서 이 exe 위치로 처음 실행할 때마다 바탕화면 바로가기를 만듭니다.
-// (폴더를 다른 PC로 옮기거나 다른 위치로 이동해도 그 PC에서 첫 실행 때 다시 만듭니다.)
+// 압축형(설치하지 않은 exe)을 실행할 때마다 바탕화면에 바로가기가 없으면 다시 만듭니다.
+// (지웠던 바로가기도 다음 실행 때 되살아납니다. 이미 있는 바로가기는 그대로 둡니다. 설치형은 설치 프로그램이 따로 만들므로 건드리지 않습니다.)
 function ensureDesktopShortcut() {
   if (process.platform !== 'win32') return;
   try {
-    const key = `${os.hostname()}|${process.execPath.toLowerCase()}`;
-    const recordFile = path.join(DATA_DIR, 'shortcuts.json');
-    let done = [];
-    try { done = JSON.parse(fs.readFileSync(recordFile, 'utf8')); } catch {}
-    if (done.includes(key)) return;
+    if (fs.existsSync(path.join(EXE_DIR, 'Uninstall Theologia Library.exe'))) return;
     const link = path.join(app.getPath('desktop'), 'Theologia Library.lnk');
-    const ok = shell.writeShortcutLink(link, 'create', {
+    if (fs.existsSync(link)) return; // 이미 있으면 (다른 위치를 가리켜도) 건드리지 않는다
+    shell.writeShortcutLink(link, 'create', {
       target: process.execPath, cwd: EXE_DIR,
       description: 'Theologia Library · 개인 신학 서재', icon: process.execPath, iconIndex: 0,
     });
-    if (ok) { done.push(key); fs.writeFileSync(recordFile, JSON.stringify(done)); } // 실패하면 다음 실행 때 다시 시도
   } catch {}
 }
 
