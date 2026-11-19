@@ -375,7 +375,7 @@ function renderDrawer() {
         <div class="acts">
           <button class="btn sm primary" data-act="read" data-v="${f.id}" ${f.missing ? 'disabled' : ''}>${f.lastPage > 0 ? `이어 읽기 p.${f.lastPage}` : '읽기'}</button>
           <button class="icon-btn" data-act="open-pdf" data-v="${f.id}" title="기본 PDF 뷰어로 열기" ${f.missing ? 'disabled' : ''}>↗</button>
-          <button class="icon-btn" data-act="show-pdf" data-v="${f.id}" title="폴더에서 보기">📂</button>
+          <button class="icon-btn" data-act="show-pdf" data-v="${f.id}" title="위치 보기">📂</button>
           ${files.length > 1 ? `<button class="icon-btn" data-act="detach" data-v="${f.id}" title="이 파일을 별도 작품으로 분리">⤴</button>` : ''}
         </div></div>`).join('')}</div>
     <div class="d-actions"><button class="btn danger sm" data-act="del-work">서재에서 제거</button></div>
