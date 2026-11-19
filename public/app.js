@@ -307,7 +307,7 @@ function locInfo(w) {
 }
 function locBtn(w, cls) {
   const L = locInfo(w); if (!L) return '';
-  return `<button class="loc ${cls || ''} ${L.allMissing ? 'warn' : ''}" data-act="show-pdf" data-v="${L.primary.id}" title="${esc(L.full)}&#10;눌러서 폴더에서 보기">📁 <span>${esc(L.allMissing ? L.text + ' · 파일 없음' : L.text)}</span></button>`;
+  return `<button class="loc ${cls || ''} ${L.allMissing ? 'warn' : ''}" data-act="show-pdf" data-v="${L.primary.id}" title="${esc(L.full)}&#10;눌러서 위치 보기">📁 <span>${esc(L.allMissing ? L.text + ' · 파일 없음' : L.text)}</span></button>`;
 }
 function resumeFile(w) {
   const fs = filesOf(w).filter((f) => !f.missing && f.lastPage > 0 && f.lastReadAt);
@@ -366,9 +366,9 @@ function renderDrawer() {
     <div class="sec"><h5>태그</h5><div class="tags" id="tags">${tagsHtml(w)}</div></div>
     <div class="sec"><h5>메모</h5><textarea data-f="note" placeholder="읽은 소감, 인용할 쪽, 참고할 점…">${esc(w.note)}</textarea></div>
     <div class="sec"><h5>위치</h5>${(locInfo(w) ? locInfo(w).list : []).map((g) => `
-      <div class="locrow"><button class="loc ${g.file.missing ? 'warn' : ''}" data-act="show-pdf" data-v="${g.file.id}" title="눌러서 폴더에서 보기">📁 <span>${esc(g.label)}</span></button>
+      <div class="locrow"><button class="loc ${g.file.missing ? 'warn' : ''}" data-act="show-pdf" data-v="${g.file.id}" title="눌러서 위치 보기">📁 <span>${esc(g.label)}</span></button>
         <div class="path">${esc(g.dir)}</div>
-        <div class="btns"><button class="btn sm" data-act="show-pdf" data-v="${g.file.id}">폴더에서 보기</button><button class="btn sm" data-act="copy-path" data-v="${g.file.id}">경로 복사</button></div></div>`).join('')}</div>
+        <div class="btns"><button class="btn sm" data-act="show-pdf" data-v="${g.file.id}">위치 보기</button><button class="btn sm" data-act="copy-path" data-v="${g.file.id}">경로 복사</button></div></div>`).join('')}</div>
     <div class="sec"><h5>PDF 파일 ${files.length}개</h5>${files.map((f) => `
       <div class="file ${f.missing ? 'gone' : ''}">
         <div class="fn"><b title="${esc(f.name)}">${esc(f.name)}</b><small title="${esc(f.path)}">${f.missing ? '파일 없음 · ' : ''}${fmtSize(f.size)}${/\.epub$/i.test(f.path) ? ` · EPUB${f.lastPage > 0 ? ` · ${Math.round(f.lastPage / 10)}% 읽음` : ''}` : f.pages > 0 ? ` · ${num(f.pages)}쪽${f.lastPage > 0 ? ` · ${f.lastPage}쪽까지 읽음` : ''}` : ''}</small></div>
