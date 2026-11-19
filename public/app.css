@@ -296,3 +296,13 @@ body.side-off .side{display:none}
 .mk-drop .mb{padding:8px 14px 4px}
 .mk-drop footer{display:flex;justify-content:flex-end;gap:8px;padding:8px 14px 12px}
 .mk-ta{min-height:130px}
+/* 책의 원본 위치 */
+.loc{display:flex;align-items:center;gap:5px;max-width:100%;margin:5px 0 0;padding:2px 7px;border:0;border-radius:6px;background:#0000000a;color:var(--muted);font:inherit;font-size:11.5px;cursor:pointer;text-align:left;white-space:nowrap;overflow:hidden}
+.loc span{overflow:hidden;text-overflow:ellipsis}
+.loc:hover{background:#6d7b5a22;color:var(--ink,#2d302b);text-decoration:underline}
+.loc.warn{background:#f5e9c8;color:#7a5a12}
+.loc.sm{display:inline-flex;margin-top:2px}
+.locrow{padding:6px 0}
+.locrow .loc{font-size:12.5px;margin:0}
+.locrow .path{margin:4px 0 0;font-family:var(--font-mono,ui-monospace,monospace);font-size:11.5px;color:var(--muted);word-break:break-all}
+.locrow .btns{display:flex;gap:6px;margin-top:6px}

@@ -88,8 +88,10 @@ ipcMain.handle('theologia:scan-folder', async (_event, folder) => {
 });
 ipcMain.handle('theologia:show-in-folder', (_event, filePath) => {
   if (typeof filePath !== 'string' || !/\.(pdf|epub)$/i.test(filePath)) return { ok: false };
-  shell.showItemInFolder(filePath);
-  return { ok: true };
+  if (fs.existsSync(filePath)) { shell.showItemInFolder(filePath); return { ok: true }; }
+  const dir = path.dirname(filePath);                     // 파일이 없어도 폴더가 남아 있으면 폴더를 연다
+  if (fs.existsSync(dir)) { shell.openPath(dir); return { ok: true, folderOnly: true }; }
+  return { ok: false };
 });
 ipcMain.handle('theologia:open-pdf', async (_event, filePath) => {
   if (typeof filePath !== 'string' || !/\.(pdf|epub)$/i.test(filePath)) return { ok: false };
