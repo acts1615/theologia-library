@@ -12,13 +12,31 @@ const prefs = () => { try { return Object.assign({ size: 18, theme: 'light' }, J
 const savePrefs = () => { try { localStorage.setItem('tl-md', JSON.stringify({ size: M.size, theme: M.theme })); } catch {} };
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-function render(text, wiki) {
-  if (wiki) text = String(text).replace(/\[\[([^\]\n|#]+)(?:[#|]([^\]\n]*))?\]\]/g, (m, n, a) => `[${(a || n).trim().replace(/[\[\]]/g, '')}](#note:${encodeURIComponent(n.trim())})`);
+function render(text, wiki, ctx) {
   const mk = window.marked; if (!mk) return '<pre>' + esc(text) + '</pre>';
-  const m = new mk.Marked({ gfm: true, renderer: { html(t) { return esc(t.text != null ? t.text : t); }, image(t) { return '[그림: ' + esc((t && t.text) || '') + ']'; } } });
+  if (wiki) {
+    text = String(text).replace(/^\uFEFF?---\r?\n[\s\S]*?\r?\n---[ \t]*(\r?\n|$)/, '');   // 맨 위 정보 블록(---)은 숨긴다
+    text = text.replace(/!\[\[([^\]\n|]+?\.(?:png|jpe?g|gif|webp|bmp))(?:\|[^\]\n]*)?\]\]/gi, (m, f) => `![${f}](${encodeURI(f.trim())})`);
+    text = text.replace(/\[\[([^\]\n|#]+)(?:[#|]([^\]\n]*))?\]\]/g, (m, n, a) => { const t = n.trim(); return `[${(a || t.split('/').pop()).trim().replace(/[\[\]]/g, '')}](#note:${encodeURIComponent(t.split('/').pop().trim())})`; });
+  }
+  const img = (t) => {
+    const alt = esc((t && t.text) || ''); const href = String((t && t.href) || '');
+    if (wiki && ctx && ctx.note && href && !/^[a-z][a-z0-9+.-]*:/i.test(href) && !href.startsWith('/') && !href.startsWith('\\') && /\.(png|jpe?g|gif|webp|bmp)$/i.test(href.split('?')[0])) return `<img class="nimg" loading="lazy" alt="${alt}" src="/api/notes/img?note=${encodeURIComponent(ctx.note)}&src=${encodeURIComponent(href)}">`;
+    return '[그림: ' + alt + ']';
+  };
+  const m = new mk.Marked({ gfm: true, renderer: { html(t) { return esc(t.text != null ? t.text : t); }, image: img } });
   const div = document.createElement('div'); div.innerHTML = m.parse(text);
   div.querySelectorAll('a').forEach((a) => { const h = a.getAttribute('href') || ''; if (wiki && /^#note:/.test(h)) { a.setAttribute('data-note', decodeURIComponent(h.slice(6))); a.setAttribute('href', '#'); a.className = 'wl'; } else if (!/^(https?:|mailto:|tel:)/i.test(h)) a.removeAttribute('href'); else { a.setAttribute('rel', 'noopener noreferrer'); a.setAttribute('target', '_blank'); } });
-  div.querySelectorAll('script,style,iframe,object,embed,form,input,button,img,svg,link,meta').forEach((n) => n.remove());
+  div.querySelectorAll('script,style,iframe,object,embed,form,input,button,img:not(.nimg),svg,link,meta').forEach((n) => n.remove());
+  if (wiki) {   // (p.87) · (PDF 25쪽) 은 눌러서 그 쪽으로 갈 수 있게 한다
+    const walker = document.createTreeWalker(div, NodeFilter.SHOW_TEXT, { acceptNode: (n) => (n.parentElement && n.parentElement.closest('a,pre,code') ? NodeFilter.FILTER_REJECT : /\(\s*(?:p\.\s*\d+|PDF\s*\d+\s*쪽)\s*\)/.test(n.nodeValue) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT) });
+    const nodes = []; while (walker.nextNode()) nodes.push(walker.currentNode);
+    for (const n of nodes) {
+      const frag = document.createDocumentFragment(); const re = /\(\s*(?:p\.\s*(\d+)|PDF\s*(\d+)\s*쪽)\s*\)/g; let last = 0, mm; const s = n.nodeValue;
+      while ((mm = re.exec(s))) { frag.appendChild(document.createTextNode(s.slice(last, mm.index))); const a = document.createElement('a'); a.href = '#'; a.className = 'pg'; a.dataset.pgKind = mm[1] ? 'printed' : 'pdf'; a.dataset.pgN = mm[1] || mm[2]; a.title = '이 쪽으로 가기'; a.textContent = mm[0]; frag.appendChild(a); last = mm.index + mm[0].length; }
+      frag.appendChild(document.createTextNode(s.slice(last))); n.parentNode.replaceChild(frag, n);
+    }
+  }
   return div.innerHTML;
 }
 function restyle() { const [bg, fg] = THEMES[M.theme] || THEMES.light; const v = $('#m-view', M.el); v.style.background = bg; v.style.color = fg; $('#m-art', M.el).style.fontSize = M.size + 'px'; }

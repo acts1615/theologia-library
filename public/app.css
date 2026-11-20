@@ -362,3 +362,6 @@ input:disabled,textarea:disabled{-webkit-text-fill-color:#7d8178;background-colo
 #drawer textarea[data-f=note]{min-height:220px;font-size:14px;line-height:1.7;padding:10px 12px;border:1px solid var(--line-strong);border-radius:8px}
 #drawer textarea[data-f=note]:focus{border-color:var(--olive);box-shadow:0 0 0 3px #00619922;outline:none}
 .nt-text,.rn-text{color:#2d302b;-webkit-text-fill-color:#2d302b;background-color:#fff}
+.nt-prev a.pg,.md-art a.pg{color:#006199;text-decoration:underline dotted;cursor:pointer;white-space:nowrap}
+.nimg,.md-art img.nimg{max-width:100%;height:auto;border-radius:6px;margin:6px 0}
+#modal mark{background:#95BDD7;color:inherit;border-radius:3px;padding:0 1px}

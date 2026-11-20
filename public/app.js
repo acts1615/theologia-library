@@ -153,6 +153,7 @@ function renderSide() {
     ${S.refreshing ? '<div class="busy"><i class="dot"></i>폴더 갱신 중…</div>' : ''}
     <h6>서재</h6>
     ${nav('all', '전체 문헌', cnt.all)}${nav('readlist', '★ 읽기 목록', cnt.readlist)}${nav('reading', '읽는 중', cnt.reading)}${nav('unread', '읽을 예정', cnt.unread)}${nav('finished', '완독', cnt.finished)}${nav('review', '확인 필요', cnt.review, true)}
+    ${S.settings && S.settings.notesDir ? '<h6>노트</h6><button class="nav" data-act="note-search"><span>✎ 노트 검색</span></button>' : ''}
     <h6>성경 66권</h6>
     ${bHead('old', '구약 39권')}${bHead('new', '신약 27권')}
     ${S.noText && S.noText.size ? `<h6>본문 검색</h6>${nav('notext', '본문 없음 (스캔본)', S.noText.size)}` : ''}
@@ -577,7 +578,7 @@ function ntRender(info) {
   $('.mb', m).innerHTML = `<div class="nt-top"><button class="btn sm" id="nt-mode">${n.mode === 'edit' ? '미리보기' : '쓰기'}</button>${n.workId ? '<button class="btn sm" id="nt-lib">서재에서 책 보기</button>' : ''}<span id="nt-save" class="help"></span></div>
     ${n.mode === 'edit' ? `<textarea id="nt-text" class="nt-text" spellcheck="false" placeholder="읽은 내용, 인용, 내 생각… [[주제]]로 다른 노트와 이을 수 있습니다.">${esc(n.text)}</textarea>` : `<article class="md-art nt-prev" id="nt-prev"></article>`}
     <div class="nt-side">${ntSideHtml(info)}</div>`;
-  if (n.mode !== 'edit') $('#nt-prev').innerHTML = window.TLMd.render(n.text || '_아직 비어 있습니다._', true);
+  if (n.mode !== 'edit') $('#nt-prev').innerHTML = window.TLMd.render(n.text || '_아직 비어 있습니다._', true, { note: n.name });
   const ta = $('#nt-text', m); if (ta) ta.addEventListener('input', () => { n.text = ta.value; n.dirty = true; clearTimeout(n.timer); const s = $('#nt-save'); if (s) { s.textContent = '쓰는 중…'; s.style.color = ''; } n.timer = setTimeout(() => ntSave(false), 1500); });
 }
 async function openNote(name, workId) {
@@ -593,12 +594,51 @@ async function openNote(name, workId) {
 }
 document.addEventListener('click', async (e) => {
   if (e.target.closest('#k-notes-pick')) { const r = await window.theologiaDesktop.selectFolder('노트 폴더 선택'); if (r && !r.canceled) $('#k-notes').value = r.folder; return; }
-  if (!NT) return; const t = e.target.closest('[data-nt], #nt-mode, #nt-lib, a.wl'); if (!t) return;
+  if (!NT) return; const t = e.target.closest('[data-nt], #nt-mode, #nt-lib, a.wl, a.pg'); if (!t) return;
   e.preventDefault();
+  if (t.matches('a.pg')) { jumpPage(t.dataset.pgKind, parseInt(t.dataset.pgN, 10)); return; }
   if (t.id === 'nt-mode') { const ta = $('#nt-text'); if (ta) NT.text = ta.value; NT.mode = NT.mode === 'edit' ? 'view' : 'edit'; await ntSave(true); const info = await api('/api/notes/note?name=' + encodeURIComponent(NT.name)).catch(() => ({ links: [], backlinks: [] })); ntRender(info); return; }
   if (t.id === 'nt-lib') { const id = NT.workId; await ntSave(true); NT = null; closeModal(); S.open = id; renderAll(); return; }
   const nm = t.dataset.nt || t.dataset.note; if (nm) openNote(nm).then(() => { const m = $('#modal h2'); if (m && NT) m.textContent = NT.name; });
 }, true);
+
+// ---------- 노트 검색 · 쪽으로 가기 ----------
+function noteSearchModal() {
+  const m = modal('노트 검색', `<input id="ns-q" type="search" placeholder="노트 안의 글자·이름을 찾습니다 (띄어쓰기로 여러 낱말)" autocomplete="off" style="width:100%"><div id="ns-res" style="margin-top:10px"><p class="help">낱말을 입력하면 노트 폴더의 모든 노트에서 찾습니다. 결과를 누르면 그 노트가 열립니다.</p></div>`, [{ label: '닫기' }]);
+  const q = m.querySelector('#ns-q'), box = m.querySelector('#ns-res'); let tm = 0, seq = 0;
+  q.focus();
+  const hl = (s, terms) => { let r = esc(s); for (const t of terms) { if (!t) continue; r = r.replace(new RegExp(esc(t).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'), (x) => `<mark>${x}</mark>`); } return r; };
+  async function run() {
+    const v = q.value.trim(); const my = ++seq; if (!v) { box.innerHTML = '<p class="help">낱말을 입력하면 노트 폴더의 모든 노트에서 찾습니다.</p>'; return; }
+    box.innerHTML = '<p class="help">찾는 중…</p>';
+    let r; try { r = await api('/api/notes/search?q=' + encodeURIComponent(v)); } catch (e) { if (my === seq) box.innerHTML = `<div class="note-warn">${esc(e.message)}</div>`; return; }
+    if (my !== seq) return; const terms = v.split(/\s+/);
+    box.innerHTML = r.results.length ? `<p class="help">${r.results.length}개 노트${r.results.length >= 100 ? ' (처음 100개)' : ''}</p>` + r.results.map((x) => `<button class="bl" data-ns="${esc(x.name)}"><b>${hl(x.name, terms)}</b>${x.snippets.map((s) => `<small>${hl(s, terms)}</small>`).join('')}</button>`).join('') : '<p class="help">찾은 노트가 없습니다.</p>';
+  }
+  q.addEventListener('input', () => { clearTimeout(tm); tm = setTimeout(run, 250); });
+  q.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); clearTimeout(tm); run(); } });
+  box.addEventListener('click', (e) => { const b = e.target.closest('[data-ns]'); if (b) openNote(b.dataset.ns); });
+}
+function fmOf(text) { const m = /^\uFEFF?---\r?\n([\s\S]*?)\r?\n---/.exec(text || ''); const o = {}; if (m) for (const l of m[1].split(/\r?\n/)) { const k = /^([A-Za-z가-힣_]+):\s*(.*)$/.exec(l); if (k) o[k[1]] = k[2].replace(/^["']|["']$/g, '').trim(); } return o; }
+function workForNote() {
+  if (!NT) return null; if (NT.workId && work(NT.workId)) return work(NT.workId);
+  const fm = fmOf(NT.text); const kf = (s) => String(s || '').replace(/[\s·.,:;\-—_'"“”‘’()『』]/g, '').toLowerCase();
+  for (const f of [fm.book, fm.title]) { if (!f) continue; const k = kf(f); if (k.length < 3) continue; const w = S.lib.works.find((x) => kf(x.title) === k) || S.lib.works.find((x) => kf(x.title).includes(k)); if (w) return w; }
+  return null;
+}
+async function jumpPage(kind, n) {
+  const w = workForNote(); if (!w) { toast('이 노트와 이어진 책을 찾지 못했습니다. 책 노트이거나, 노트 맨 위 정보 블록에 book: 책 제목 이 있어야 합니다.', true); return; }
+  const pdfs = filesOf(w).filter((f) => !f.missing && /\.pdf$/i.test(f.path || f.name || ''));
+  if (!pdfs.length) { toast('쪽으로 열 수 있는 PDF가 없습니다. (EPUB은 쪽 번호가 없습니다)', true); return; }
+  let fileId = pdfs[0].id, page = n;
+  if (kind === 'printed') {
+    let hit = null;
+    for (const f of pdfs) { try { const j = await api('/api/search/pnum?fileId=' + encodeURIComponent(f.id)); for (const [a, b, d] of j.pnum || []) if (a <= n - d && n - d <= b) { hit = { f, page: n - d + 1 }; break; } } catch {} if (hit) break; }
+    if (!hit) { toast(`이 책은 인쇄 쪽 정보가 없어 p.${n}로 갈 수 없습니다. 본문 색인을 만든 책이어야 합니다. PDF 쪽은 (PDF ${n}쪽)처럼 적으면 갈 수 있습니다.`, true); return; }
+    fileId = hit.f.id; page = hit.page;
+  }
+  closeModal(); await window.TLReader.open({ fileId, page });
+}
 
 // ---------- 폴더 동작 ----------
 function busy(msg) {
@@ -732,6 +772,7 @@ document.addEventListener('click', async (e) => {
     case 'status': { const w = work(S.open); queueSave(w.id, { status: v }); renderDrawer(); renderList(); break; }
     case 'ok-review': queueSave(S.open, { review: false }); renderAll(); break;
     case 'bible': bibleModal(work(S.open)); break;
+    case 'note-search': noteSearchModal(); break;
     case 'note-open': openNote(work(v) ? work(v).title : '', v); break;
     case 'bookstore': bookstoreModal(work(S.open)); break;
     case 'fill-isbn': fillByIsbn(S.open); break;

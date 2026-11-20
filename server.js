@@ -233,6 +233,13 @@ function createServer({ publicDir, dataDir, settingsDirs = [], restart = null })
             const b = await readBody(req, 4 * 1024 * 1024); const name = String(b.name || '').trim(); if (!name) return sendJson(res, 400, { error: '이름이 필요합니다.' });
             return sendJson(res, 200, await notes.write(name, b.text, b.baseMtime));
           }
+          if (p === '/api/notes/search' && m === 'GET') return sendJson(res, 200, { results: await notes.search(url.searchParams.get('q') || '') });
+          if (p === '/api/notes/img' && m === 'GET') {
+            const f = await notes.image(url.searchParams.get('note') || '', url.searchParams.get('src') || '');
+            if (!f) { res.writeHead(404); return res.end(); }
+            const ext = path.extname(f).toLowerCase(); const mt = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp', '.bmp': 'image/bmp' }[ext] || 'application/octet-stream';
+            res.writeHead(200, { 'Content-Type': mt, 'Cache-Control': 'max-age=60', 'X-Content-Type-Options': 'nosniff' }); return fs.createReadStream(f).pipe(res);
+          }
           if (p === '/api/notes/list' && m === 'GET') return sendJson(res, 200, { notes: (await notes.walk()).map((x) => x.name).sort((a, b) => a.localeCompare(b, 'ko')) });
         } catch (e) { return sendJson(res, e && e.status || 500, { error: String((e && e.message) || e) }); }
       }
