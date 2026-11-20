@@ -73,12 +73,13 @@ function createStore(dataDir) {
     let addedWorks = 0, grouped = 0;
     if (fresh.length) {
       const canon = fresh.map((f) => ({ ...f, origName: f.name, name: L.canonName(f.name) }));
+      const byTitleKey = new Map(); for (const x of state.works) if (!byTitleKey.has(x.titleKey)) byTitleKey.set(x.titleKey, x);
       for (const g of L.groupPdfFiles(canon)) {
         const first = g.files[0];
         const title = L.displayTitle(first.origName);
         const tkey = L.normalized(g.title) || L.normalized(title);
-        let w = state.works.find((x) => x.titleKey === tkey);
-        if (!w) { w = newWork(title, first, { review: g.files.length > 1 }); w.titleKey = tkey; addedWorks++; }
+        let w = byTitleKey.get(tkey);
+        if (!w) { w = newWork(title, first, { review: g.files.length > 1 }); w.titleKey = tkey; byTitleKey.set(tkey, w); addedWorks++; }
         else if (g.files.length > 0 && filesOf(w.id).length > 0) w.review = w.review || false;
         for (const gf of g.files) {
           state.files.push({

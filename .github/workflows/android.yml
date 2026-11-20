@@ -1,0 +1,40 @@
+# Actions 탭 → android → Run workflow : 안드로이드 설치 파일(APK)을 만들어 최신 릴리스에 붙입니다.
+# 릴리스가 없으면 실행 결과의 Artifacts 로만 올라갑니다.
+name: android
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - run: npm install --no-audit --no-fund
+      - run: node scripts/build-web.js
+      - run: npx cap add android
+      - run: bash scripts/prepare-android.sh
+      - run: npx cap sync android
+      - name: APK 만들기
+        working-directory: mobile/android
+        run: ./gradlew assembleDebug --no-daemon
+      - name: 파일 이름 정리
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk Theologia-Mobile.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Theologia-Mobile
+          path: mobile/Theologia-Mobile.apk
+      - name: 최신 릴리스에 붙이기
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$(gh release view --json tagName -q .tagName)" Theologia-Mobile.apk --clobber || echo "릴리스가 없어 Artifacts 로만 올렸습니다."

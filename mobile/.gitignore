@@ -1,0 +1,6 @@
+node_modules/
+www/app.js
+www/pdfjs/
+android/
+package-lock.json
+www/sample.pdf

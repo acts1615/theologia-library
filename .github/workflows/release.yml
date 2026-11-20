@@ -21,7 +21,7 @@ jobs:
       - name: 앱 묶기
         run: |
           mkdir stage
-          tar --exclude=./.git --exclude=./.github --exclude=./stage -cf - . | tar -xf - -C stage
+          tar --exclude=./.git --exclude=./.github --exclude=./mobile --exclude=./stage -cf - . | tar -xf - -C stage
           (cd stage && npm ci --omit=dev --no-audit --no-fund)
           npx --yes @electron/asar pack stage app.asar
           SHA=$(sha256sum app.asar | cut -d' ' -f1)

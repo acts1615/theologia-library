@@ -311,23 +311,31 @@ function groupPdfFiles(files) {
     normalizedTitle: removePartMarker(file.name),
     partNumber: extractPartNumber(file.name)
   }));
+  // 성능: 4000개 이상에서도 빠르도록 토큰·폴더를 한 번만 계산하고, 같은 제목은 Map 으로 찾는다. (결과는 이전 방식과 같다)
   const groups = [];
+  const byKey = new Map();
+  const dirOf = (p) => p.split(/[\\/]/).slice(0, -1).join("/");
   for (const file of prepared) {
-    const sameKey = groups.find((group) => group.seed.normalizedTitle === file.normalizedTitle);
+    const sameKey = byKey.get(file.normalizedTitle);
     if (sameKey) {
       sameKey.files.push(file);
       continue;
     }
-    const candidate = groups.find((group) => {
-      const similarity = jaccard(tokens(group.seed.normalizedTitle), tokens(file.normalizedTitle));
-      const sameFolder = group.seed.path.split(/[\\/]/).slice(0, -1).join("/") === file.path.split(/[\\/]/).slice(0, -1).join("/");
-      return similarity >= 0.72 && (sameFolder || similarity >= 0.86);
-    });
+    const ft = tokens(file.normalizedTitle); const fdir = dirOf(file.path);
+    let candidate = null;
+    for (const group of groups) {
+      const a = group.seedTokens.size, b = ft.size;
+      // 자카드 유사도는 (작은 쪽 / 큰 쪽) 을 넘을 수 없다: 0.72 에 못 미치면 건너뛴다
+      if (Math.min(a, b) < 0.72 * Math.max(a, b)) continue;
+      const similarity = jaccard(group.seedTokens, ft);
+      if (similarity >= 0.72 && (group.seedDir === fdir || similarity >= 0.86)) { candidate = group; break; }
+    }
     if (candidate) {
       candidate.files.push(file);
       continue;
     }
-    groups.push({ seed: file, files: [file] });
+    const g = { seed: file, files: [file], seedTokens: ft, seedDir: fdir };
+    groups.push(g); byKey.set(file.normalizedTitle, g);
   }
   return groups.map((group, index2) => {
     const similarity = group.files.length === 1 ? 1 : group.files.reduce((total, file) => total + jaccard(tokens(group.seed.normalizedTitle), tokens(file.normalizedTitle)), 0) / group.files.length;

@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2f3a2f">
+<title>Theologia</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<header class="top">
+  <div class="row1">
+    <h1>Theologia <small id="ver"></small></h1>
+    <button class="ico" id="btn-add" aria-label="폴더 추가">＋</button>
+    <button class="ico" id="btn-settings" aria-label="설정">⚙</button>
+  </div>
+  <input id="q" type="search" placeholder="제목·저자·분류 검색" autocomplete="off">
+  <div id="chips" class="chips"></div>
+  <div class="row2"><span id="count"></span><button class="lnk" id="btn-sort">이름순</button></div>
+</header>
+<main id="list"></main>
+
+<div id="sheet" class="sheet" hidden><div class="sheet-in"><div id="sheet-body"></div></div></div>
+
+<div id="reader" class="reader" hidden>
+  <div class="rd-top"><button class="ico" id="rd-back" aria-label="닫기">←</button><span id="rd-title"></span></div>
+  <div id="rd-view" class="rd-view"><canvas id="rd-canvas"></canvas></div>
+  <div class="rd-bot">
+    <button class="ico" id="rd-prev" aria-label="이전 쪽">‹</button>
+    <span class="pg"><input id="rd-page" inputmode="numeric" value="1"><span id="rd-total"></span></span>
+    <button class="ico" id="rd-next" aria-label="다음 쪽">›</button>
+    <span class="sp"></span>
+    <button class="ico" id="rd-zout" aria-label="줄이기">－</button>
+    <button class="ico" id="rd-zin" aria-label="키우기">＋</button>
+  </div>
+</div>
+
+<div id="busy" class="busy" hidden></div>
+<div id="toast"></div>
+<script src="app.js"></script>
+</body>
+</html>

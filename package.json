@@ -21,7 +21,8 @@
       "**/*",
       "!dist/**",
       "!.git/**",
-      "!.github/**"
+      "!.github/**",
+      "!mobile/**"
     ],
     "asar": true,
     "win": {

@@ -1,0 +1,6 @@
+{
+  "appId": "kr.goodsoldier.theologia.mobile",
+  "appName": "Theologia",
+  "webDir": "www",
+  "android": { "allowMixedContent": false }
+}
