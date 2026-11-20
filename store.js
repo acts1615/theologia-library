@@ -85,8 +85,8 @@ function createStore(dataDir) {
           state.files.push({
             id: nid('f'), workId: w.id, path: gf.path, name: gf.origName, size: gf.size ?? null,
             modifiedAt: gf.modifiedAt ?? null, partNumber: gf.partNumber ?? null, missing: false, addedAt: now,
-            kind: /\.epub$/i.test(gf.path) ? 'epub' : 'pdf',
-            pages: /\.epub$/i.test(gf.path) ? 1000 : null, lastPage: 0, lastReadAt: null,   // EPUB 은 책 전체를 0~1000 의 가상 '쪽'으로 본다
+            kind: /\.epub$/i.test(gf.path) ? 'epub' : /\.(?:md|markdown)$/i.test(gf.path) ? 'md' : 'pdf',
+            pages: /\.(?:epub|md|markdown)$/i.test(gf.path) ? 1000 : null, lastPage: 0, lastReadAt: null,   // EPUB 은 책 전체를 0~1000 의 가상 '쪽'으로 본다
           });
         }
         if (g.files.length > 1) grouped += g.files.length;
@@ -273,6 +273,12 @@ function createStore(dataDir) {
       if (!opts.force && w.classVer === CLS_VER) continue;
       if (w.category && !w.classSource) w.classSource = 'manual';
       if (w.bibleBooks && w.bibleBooks.length && !w.bibleSource) w.bibleSource = 'manual';
+      // 마크다운(.md) 파일만으로 된 작품은 제목·폴더와 상관없이 'MD 파일' 분류 하나로 모은다 (직접 고른 분류는 그대로 둔다)
+      { const ns = byWork.get(w.id) || [];
+        if (ns.length && ns.every((n) => /\.(?:md|markdown)$/i.test(n))) {
+          if (w.classSource !== 'manual') { w.category = 'MD 파일'; w.classSource = 'auto'; w.classConf = 100; w.classReason = 'md 파일'; cat++; }
+          w.classVer = CLS_VER; changed++; continue;
+        } }
       const mg = L.magazineInfo(w.title, byWork.get(w.id) || []);
       if (mg && !w.isbn && w.fillState !== 'skip') { w.fillState = 'skip'; w.fillVer = 4; if (!w.year && mg.year) w.year = mg.year; }
       const hint = L.fileHint(byWork.get(w.id) || []);

@@ -122,7 +122,7 @@ public class FolderPlugin extends Plugin {
                     continue;
                 }
                 String lower = name.toLowerCase(Locale.ROOT);
-                if (!(lower.endsWith(".pdf") || lower.endsWith(".epub"))) continue;
+                if (!(lower.endsWith(".pdf") || lower.endsWith(".epub") || lower.endsWith(".md") || lower.endsWith(".markdown"))) continue;
                 JSObject f = new JSObject();
                 f.put("path", rel + name);
                 f.put("uri", DocumentsContract.buildDocumentUriUsingTree(tree, id).toString());
@@ -151,7 +151,8 @@ public class FolderPlugin extends Plugin {
             return;
         }
         try {
-            String ext = name.toLowerCase(Locale.ROOT).endsWith(".epub") ? ".epub" : ".pdf";
+            String lowerName = name.toLowerCase(Locale.ROOT);
+            String ext = lowerName.endsWith(".epub") ? ".epub" : (lowerName.endsWith(".md") || lowerName.endsWith(".markdown")) ? ".md" : ".pdf";
             String key = UUID.nameUUIDFromBytes(uriStr.getBytes("UTF-8")).toString();
             File dst = new File(cacheDir(), key + ext);
             if (!(dst.exists() && dst.length() > 0 && (size <= 0 || dst.length() == size))) {

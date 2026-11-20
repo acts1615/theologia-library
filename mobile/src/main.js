@@ -1,12 +1,17 @@
 import { plugin, isNative, fileUrl, appPlugin } from './native.js';
+import { marked } from 'marked';
 const fs = require('fs');
 const { createStore } = require('../../store.js');
 const CLS = require('../../classify.js');
 
+marked.use({ gfm: true, breaks: false, renderer: {
+  html({ text }) { return esc(text); },            // 글 속의 HTML 태그는 그대로 글자로 보여 준다
+  image({ text }) { return text ? `<em>[그림: ${esc(text)}]</em>` : ''; },
+} });
 const $ = (s, r = document) => r.querySelector(s);
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const num = (n) => Number(n).toLocaleString('ko-KR');
-const VER = '0.1.1';
+const VER = '0.1.2';
 let store, trees = {}, uris = {};
 const S = { cat: '', q: '', sort: 'name', shown: 80 };
 
@@ -80,7 +85,7 @@ function renderList() {
   const part = list.slice(0, S.shown);
   box.innerHTML = part.map((w) => {
     const fl = files.get(w.id) || []; const p = pct(w);
-    const meta = [w.category, w.author, fl.length > 1 ? `${fl.length}개 파일` : (fl[0] && fl[0].kind === 'epub' ? 'EPUB' : '')].filter(Boolean).join(' · ');
+    const meta = [w.category, w.author, fl.length > 1 ? `${fl.length}개 파일` : (fl[0] && fl[0].kind === 'epub' ? 'EPUB' : fl[0] && fl[0].kind === 'md' ? 'MD' : '')].filter(Boolean).join(' · ');
     return `<button class="item" data-id="${esc(w.id)}"><span class="t">${esc(w.title)}</span><span class="m">${esc(meta)}</span>${p != null ? `<span class="bar"><b style="width:${p}%"></b></span>` : ''}</button>`;
   }).join('') + (list.length > part.length ? `<button class="more" id="more">더 보기 (${num(list.length - part.length)}권 남음)</button>` : '');
 }
@@ -125,7 +130,7 @@ function openDetail(id) {
     <label class="fld"><span>분류</span><input id="d-cat" list="d-cats" value="${esc(w.category || '')}" placeholder="분류 없음" autocomplete="off"><datalist id="d-cats">${cats.map((c) => `<option value="${esc(c)}">`).join('')}</datalist></label>
     <label class="fld"><span>상태</span><select id="d-status">${[['unread', '읽기 전'], ['reading', '읽는 중'], ['finished', '다 읽음']].map(([v, l]) => `<option value="${v}"${w.status === v ? ' selected' : ''}>${l}</option>`).join('')}</select></label>
     <h3>파일</h3>
-    ${fl.map((f) => `<div class="file"><div class="fn">${esc(f.name)}<small>${f.kind === 'epub' ? 'EPUB' : 'PDF'}${f.pages > 0 && f.kind !== 'epub' ? ` · ${f.lastPage || 0}/${f.pages}쪽` : ''}${f.size ? ` · ${(f.size / 1048576).toFixed(1)}MB` : ''}</small></div><button class="btn pri" data-read="${esc(f.id)}">${f.lastPage > 1 && f.kind !== 'epub' ? '이어 읽기' : '읽기'}</button></div>`).join('')}
+    ${fl.map((f) => `<div class="file"><div class="fn">${esc(f.name)}<small>${f.kind === 'epub' ? 'EPUB' : f.kind === 'md' ? 'MD' : 'PDF'}${f.kind === 'md' ? (f.lastPage > 0 ? ` · ${Math.round(f.lastPage / 10)}% 읽음` : '') : f.pages > 0 && f.kind !== 'epub' ? ` · ${f.lastPage || 0}/${f.pages}쪽` : ''}${f.size ? ` · ${(f.size / 1048576).toFixed(1)}MB` : ''}</small></div><button class="btn pri" data-read="${esc(f.id)}">${f.lastPage > 1 && f.kind !== 'epub' ? '이어 읽기' : '읽기'}</button></div>`).join('')}
     <button class="btn full" id="d-close">닫기</button>`;
   $('#sheet').hidden = false; $('#sheet').dataset.id = id;
 }
@@ -142,12 +147,13 @@ function loadPdfjs() {
   if (!pdfjsP) { const u = new URL('./pdfjs/pdf.min.js', location.href).href; pdfjsP = import(u).then((m) => { m.GlobalWorkerOptions.workerSrc = new URL('./pdfjs/pdf.worker.min.js', location.href).href; return m; }); }
   return pdfjsP;
 }
-const R = { doc: null, fid: null, page: 1, zoom: 1, token: 0, task: null };
+const R = { mode: 'pdf', doc: null, fid: null, page: 1, zoom: 1, token: 0, task: null };
 async function openFile(fid) {
   const f = store.fileById(fid);
   if (!f) return;
   if (f.kind === 'epub') { toast('EPUB 읽기는 다음 버전에서 넣겠습니다. 지금은 PC 앱에서 읽어 주세요.', true); return; }
   const P = plugin(); const uri = uris[f.path];
+  if (f.kind === 'md') return openMarkdown(f, P, uri);
   if (!P || !uri) { toast('이 파일의 위치를 알 수 없습니다. 폴더를 다시 읽어 주세요.', true); return; }
   busy('책을 여는 중…'); await tick();
   try {
@@ -155,6 +161,7 @@ async function openFile(fid) {
     const c = await P.copy({ uri, name: f.name, size: f.size || 0 });
     const buf = await (await fetch(fileUrl(c.path))).arrayBuffer();
     const doc = await pdfjs.getDocument({ data: buf, cMapUrl: './pdfjs/cmaps/', cMapPacked: true, standardFontDataUrl: './pdfjs/standard_fonts/' }).promise;
+    R.mode = 'pdf'; $('#reader').classList.remove('md-mode'); $('#md-view').hidden = true; $('#rd-canvas').hidden = false;
     R.doc = doc; R.fid = fid; R.zoom = 1; R.page = Math.min(Math.max(f.lastPage || 1, 1), doc.numPages);
     store.setFilePages(fid, doc.numPages);
     $('#rd-title').textContent = f.name.replace(/\.pdf$/i, '');
@@ -184,7 +191,39 @@ async function showPage() {
   store.setFileProgress(R.fid, R.page, R.doc.numPages); store.flush();
 }
 function go(n) { if (!R.doc) return; const p = Math.min(Math.max(n, 1), R.doc.numPages); if (p !== R.page) { R.page = p; showPage(); } }
-function closeReader() { $('#reader').hidden = true; R.token++; if (R.doc) { try { R.doc.destroy(); } catch {} } R.doc = null; render(); const id = $('#sheet').dataset.id; if (id) openDetail(id); }
+function closeReader() { if (R.mode === 'md') { const fr = mdFrac(); clearTimeout(MD.timer); if (MD.fid) { store.setFileProgress(MD.fid, Math.round(fr * 1000), 1000); store.flush(); } } $('#reader').hidden = true; R.token++; if (R.doc) { try { R.doc.destroy(); } catch {} } R.doc = null; render(); const id = $('#sheet').dataset.id; if (id) openDetail(id); }
+
+// ---------- 마크다운(.md) 읽기 ----------
+const MD = { fid: null, size: 17, timer: null };
+async function openMarkdown(f, P, uri) {
+  if (!P || !uri) { toast('이 파일의 위치를 알 수 없습니다. 폴더를 다시 읽어 주세요.', true); return; }
+  busy('글을 여는 중…'); await tick();
+  try {
+    const c = await P.copy({ uri, name: f.name, size: f.size || 0 });
+    const text = await (await fetch(fileUrl(c.path))).text();
+    const view = $('#md-view');
+    view.innerHTML = marked.parse(text.replace(/^\uFEFF/, ''));
+    view.querySelectorAll('a').forEach((a) => { const h = a.getAttribute('href') || ''; if (!/^(https?:|mailto:|tel:)/i.test(h)) { a.removeAttribute('href'); a.classList.add('dead'); } });
+    MD.fid = f.id; MD.size = Number(localStorage.getItem('mdsize')) || 17; view.style.fontSize = MD.size + 'px';
+    R.mode = 'md'; R.doc = null;
+    const rd = $('#reader'); rd.classList.add('md-mode'); $('#rd-canvas').hidden = true; view.hidden = false;
+    $('#rd-title').textContent = f.name.replace(/\.(?:md|markdown)$/i, '');
+    rd.hidden = false; closeDetail();
+    const box = $('#rd-view'); await tick();
+    const frac = Math.min(Math.max((f.lastPage || 0) / 1000, 0), 1);
+    box.scrollTop = frac * Math.max(0, box.scrollHeight - box.clientHeight);
+    store.setFilePages(f.id, 1000); mdProgress();
+  } catch (e) { toast('글을 열지 못했습니다: ' + (e && e.message || e), true); }
+  finally { busy(''); }
+}
+function mdFrac() { const b = $('#rd-view'); const max = b.scrollHeight - b.clientHeight; return max > 0 ? Math.min(1, Math.max(0, b.scrollTop / max)) : 1; }
+function mdProgress() {
+  if (R.mode !== 'md' || !MD.fid) return;
+  const fr = mdFrac(); $('#rd-pct').textContent = Math.round(fr * 100) + '%';
+  clearTimeout(MD.timer); MD.timer = setTimeout(() => { store.setFileProgress(MD.fid, Math.round(fr * 1000), 1000); store.flush(); }, 600);
+}
+function mdSize(d) { MD.size = Math.min(30, Math.max(12, MD.size + d)); localStorage.setItem('mdsize', String(MD.size)); $('#md-view').style.fontSize = MD.size + 'px'; mdProgress(); }
+document.addEventListener('DOMContentLoaded', () => { $('#rd-view').addEventListener('scroll', mdProgress, { passive: true }); });
 
 // ---------- 설정 ----------
 function openSettings() {
@@ -214,6 +253,8 @@ document.addEventListener('click', async (e) => {
   if (t.id === 's-cache') { try { await plugin().clearCache(); toast('임시 복사본을 지웠습니다.'); } catch { toast('지우지 못했습니다.', true); } return; }
   if (t.id === 'rd-prev') return go(R.page - 1);
   if (t.id === 'rd-next') return go(R.page + 1);
+  if (t.id === 'rd-zin' && R.mode === 'md') return mdSize(1);
+  if (t.id === 'rd-zout' && R.mode === 'md') return mdSize(-1);
   if (t.id === 'rd-zin') { R.zoom = Math.min(R.zoom * 1.25, 4); return showPage(); }
   if (t.id === 'rd-zout') { R.zoom = Math.max(R.zoom / 1.25, 0.6); return showPage(); }
   if (t.id === 'rd-back') return closeReader();

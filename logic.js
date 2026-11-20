@@ -268,7 +268,7 @@ var PART_PATTERNS = [
 ];
 var NOISE = /(?:scan|scanned|ebook|e-book|pdf|final|edited|ocr|본문|스캔본|완역|개정판|copy|복사본|\[[^\]]*\]|\([^)]*\))/gi;
 function normalizePdfTitle(value) {
-  return value.normalize("NFKC").replace(/\.(?:pdf|epub)$/i, "").replace(NOISE, " ").replace(/[“”"'‘’]/g, "").replace(/[,:;·|]+/g, " ").replace(/\s+/g, " ").trim().toLocaleLowerCase("ko-KR");
+  return value.normalize("NFKC").replace(/\.(?:pdf|epub|md|markdown)$/i, "").replace(NOISE, " ").replace(/[“”"'‘’]/g, "").replace(/[,:;·|]+/g, " ").replace(/\s+/g, " ").trim().toLocaleLowerCase("ko-KR");
 }
 function extractPartNumber(value) {
   const normalized2 = normalizePdfTitle(value);
@@ -359,13 +359,13 @@ function normalized(value) {
 
 // ---- 표시용 제목: 파일명에서 확장자·권 표시·스캔 표기를 걷어낸다 ----
 function displayTitle(name) {
-  let t = String(name).normalize('NFC').replace(/\.(?:pdf|epub)$/i, '');
+  let t = String(name).normalize('NFC').replace(/\.(?:pdf|epub|md|markdown)$/i, '');
   t = t.replace(/[\[(（【][^\])）】]*(?:scan|scanned|ocr|ebook|e-book|스캔|완역|개정|복사)[^\])）】]*[\])）】]/gi, ' ');
   t = t.replace(/(?:^|[\s._-])(?:part|pt|volume|vol|book)\s*[-_. ]*(?:\d+|[ivxlcdm]+)(?=$|[\s._-])/gi, ' ');
   t = t.replace(/(?:^|[\s._-])제?\s*\d+\s*(?:권|부|편)(?=$|[\s._-])/g, ' ');
   t = t.replace(/(?:^|[\s._-])(?:상권|하권)(?=$|[\s._-])/g, ' ');
   t = t.replace(/_+/g, ' ').replace(/[\s\-–.]+$/, '').replace(/^[\s\-–.]+/, '').replace(/\s+/g, ' ').trim();
-  return t || String(name).replace(/\.(?:pdf|epub)$/i, '');
+  return t || String(name).replace(/\.(?:pdf|epub|md|markdown)$/i, '');
 }
 
 // 그룹화 전에 "제3권" 표기를 "3권"으로 통일
@@ -382,7 +382,7 @@ function _core(t) { return _norm(String(t || "").split(/[:(\[]| - /)[0]); }
 function _bigrams(t) { const a = new Set(); for (let i = 0; i < t.length - 1; i++) a.add(t.slice(i, i + 2)); return a; }
 // 파일명에서 검색에 방해되는 꼬리표(OCR, n25, 권수, 상/하 등)를 걷어낸다
 function cleanForSearch(title) {
-  let t = String(title || "").normalize("NFC").replace(/\.(?:pdf|epub)$/i, " ");
+  let t = String(title || "").normalize("NFC").replace(/\.(?:pdf|epub|md|markdown)$/i, " ");
   t = t.replace(/(^|[^0-9a-z])n\d{2,4}[a-z]?(?![0-9a-z])/gi, " ");
   t = t.replace(/goodreader\s*\uC6A9?|\bocr\b|\uC2A4\uCE94(\uBCF8)?|\bscan(ned)?\b/gi, " ");
   t = t.replace(/[\[\]()\uFF08\uFF09\u3010\u3011~_]+/g, " ");
@@ -465,7 +465,7 @@ function cleanAuthor(raw) {
 }
 const nameLike2 = (x) => /^[가-힣]{2,4}(?:\s[가-힣]{1,3})?$|^[A-Za-z][A-Za-z .·]{2,24}$/.test(String(x).trim()) && !TAGLIKE.test(String(x).trim());
 function parseFileNameBase(name) {
-  let t = String(name || "").normalize("NFC").replace(/\.(?:pdf|epub)$/i, "").replace(/\s*\(\d+\)\s*$/, "").trim().replace(PUB_PREFIX, "").trim();
+  let t = String(name || "").normalize("NFC").replace(/\.(?:pdf|epub|md|markdown)$/i, "").replace(/\s*\(\d+\)\s*$/, "").trim().replace(PUB_PREFIX, "").trim();
   // "[저자] 제목" / "【저자】 제목" → "제목_저자" ([시집] 같은 분류 표시는 그대로 둔다)
   { const m = t.match(/^[\[【]\s*([^\]】]{2,20}?)\s*[\]】]\s*(.{2,})$/); if (m && nameLike2(m[1]) && !TAGLIKE.test(m[1].trim())) t = m[2].trim() + "_" + m[1].trim(); }
   const parts = t.split("_").map((x) => x.trim()).filter((x) => x.length);
@@ -495,7 +495,7 @@ function parseFileNameBase(name) {
 // 제목/저자 순서를 확신할 수 없으면 alt 에 뒤집은 해석을 담아 둔다(조회 때 둘 다 시도).
 function parseFileName(name) {
   let raw = String(name || "").normalize("NFC");
-  const m = raw.replace(/\.(?:pdf|epub)$/i, "").match(/^(.*?)\s*[\(（]([^()（）]*(?:지음|옮김|옮긴이|엮음|편저|저|역)[^()（）]*)[\)）]\s*$/);
+  const m = raw.replace(/\.(?:pdf|epub|md|markdown)$/i, "").match(/^(.*?)\s*[\(（]([^()（）]*(?:지음|옮김|옮긴이|엮음|편저|저|역)[^()（）]*)[\)）]\s*$/);
   if (m && m[1].trim().length >= 2) raw = m[1].trim() + "_" + m[2].trim() + ".pdf";
   const r = parseFileNameBase(raw);
   if (!r.author) return r;
@@ -504,7 +504,7 @@ function parseFileName(name) {
   if (nameLike2(r.title) && a.length >= 3 && !nameLike2(a)) out.alt = { title: a, author: r.title, volume: r.volume };
   else if (nameLike2(r.title) && nameLike2(a)) out.alt = { title: a, author: r.title, volume: r.volume };
   // "저자 - 제목" (왼쪽이 사람 이름, 오른쪽이 이름이 아닌 긴 말)
-  if (!out.alt) { const h = String(raw).replace(/\.(?:pdf|epub)$/i, "").match(/^([가-힣]{2,4})\s+-\s+(.{4,})$/); if (h && !/_/.test(raw)) return { title: h[2].trim(), author: h[1], volume: "" }; }
+  if (!out.alt) { const h = String(raw).replace(/\.(?:pdf|epub|md|markdown)$/i, "").match(/^([가-힣]{2,4})\s+-\s+(.{4,})$/); if (h && !/_/.test(raw)) return { title: h[2].trim(), author: h[1], volume: "" }; }
   return out;
 }
 function fileHint(fileNames, fallbackTitle) {
@@ -538,13 +538,13 @@ const SERIES_TAGS = [
 ];
 function seriesTags(title, fileNames) {
   const out = [];
-  const cands = [String(title || ""), ...(fileNames || []).map((n) => String(n || "").normalize("NFC").replace(/\.(?:pdf|epub)$/i, ""))];
+  const cands = [String(title || ""), ...(fileNames || []).map((n) => String(n || "").normalize("NFC").replace(/\.(?:pdf|epub|md|markdown)$/i, ""))];
   for (const [tag, re] of SERIES_TAGS) if (cands.some((t) => re.test(t.normalize("NFC")))) out.push(tag);
   return out;
 }
 function seriesHints(title, fileNames, base) {
   const out = [];
-  const names = [String(title || ""), ...(fileNames || []).map((n) => String(n).replace(/\.(?:pdf|epub)$/i, ""))];
+  const names = [String(title || ""), ...(fileNames || []).map((n) => String(n).replace(/\.(?:pdf|epub|md|markdown)$/i, ""))];
   for (const t of names) {
     const em = SERIES.find((s) => s.re.test(t));
     const hasAuthor = /송병현/.test(t) || (base && /송병현/.test(base.author || ""));
@@ -565,7 +565,7 @@ const MAGAZINES = [
   { re: /^\s*묵상과\s*설교/, name: "묵상과 설교", publisher: "성서유니온선교회" },
 ];
 function magazineInfo(title, fileNames) {
-  const names = [String(title || ""), ...(fileNames || []).map((n) => String(n).replace(/\.(?:pdf|epub)$/i, ""))];
+  const names = [String(title || ""), ...(fileNames || []).map((n) => String(n).replace(/\.(?:pdf|epub|md|markdown)$/i, ""))];
   for (const t of names) {
     const m = MAGAZINES.find((x) => x.re.test(t)); if (!m) continue;
     const d = t.match(/(\d{4})\s*년\s*(\d{1,2})(?:\s*[-~]\s*(\d{1,2}))?\s*월/);
@@ -585,7 +585,7 @@ const COMMENTARY = [
   { id: "MAIN", re: /(?:^|[^가-힣])메인\s*아이디어/, label: "메인 아이디어 주석", keys: ["메인아이디어"], extra: ["메인아이디어"] },
 ];
 function commentaryParts(name, id) {
-  const parts = String(name).normalize("NFC").replace(/\.(?:pdf|epub)$/i, "").split("_").map((x) => x.trim()).filter(Boolean);
+  const parts = String(name).normalize("NFC").replace(/\.(?:pdf|epub|md|markdown)$/i, "").split("_").map((x) => x.trim()).filter(Boolean);
   const strip = (x) => x.replace(/교부들의\s*성경\s*주해/g, " ").replace(/강해로\s*푸는(?:\s*신약)?/g, " ").replace(/(?:구약|신약)\s*\(\s*\d+\s*\)/g, " ").replace(/(?:^|\s)(?:HOW|WBC|BST)(?=\s|$)/gi, " ").replace(/메인\s*아이디어/g, " ").replace(/\bn\d{2}[a-z]?\b/gi, " ")
     .replace(/\(\s*(?:상|중|하)\s*\)/g, " ").replace(/\b\d{1,3}\s*-\s*\d{1,3}\b(?=\s*[가-힣])/g, " ").replace(/^\s*\d{1,3}(?=\s|\(|$)/, " ")
     .replace(/\s*\d+\s*[:\-–]\s*\d+(?:\s*[:\-–]\s*\d+)?\s*$/, " ").replace(/[\(\)\[\]]/g, " ").replace(/\s+/g, " ").trim();
@@ -597,7 +597,7 @@ function commentaryParts(name, id) {
   return { book, author };
 }
 function commentaryHints(title, fileNames) {
-  const names = [String(title || ""), ...(fileNames || []).map((n) => String(n).replace(/\.(?:pdf|epub)$/i, ""))];
+  const names = [String(title || ""), ...(fileNames || []).map((n) => String(n).replace(/\.(?:pdf|epub|md|markdown)$/i, ""))];
   for (const t of names) {
     const c = COMMENTARY.find((x) => x.re.test(t)); if (!c) continue;
     const { book, author } = commentaryParts(t, c.id);

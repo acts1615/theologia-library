@@ -1,6 +1,6 @@
 {
   "name": "theologia-library-mobile",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "description": "Theologia Library 안드로이드 앱 (폰 폴더의 PDF·EPUB을 한꺼번에 불러와 보는 서재)",
   "scripts": {
@@ -10,7 +10,8 @@
     "@capacitor/android": "^6.2.0",
     "@capacitor/app": "^6.0.0",
     "@capacitor/cli": "^6.2.0",
-    "@capacitor/core": "^6.2.0"
+    "@capacitor/core": "^6.2.0",
+    "marked": "^15.0.12"
   },
   "devDependencies": {
     "esbuild": "^0.25.12"

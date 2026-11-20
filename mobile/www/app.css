@@ -50,3 +50,18 @@ main{padding:8px 12px 40px}
 .busy[hidden]{display:none}
 #toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));transform:translateX(-50%) translateY(20px);z-index:60;background:#2f3a2f;color:#fff;padding:11px 16px;border-radius:12px;max-width:88vw;opacity:0;pointer-events:none;transition:.2s;font-size:13.5px}
 #toast.show{opacity:1;transform:translateX(-50%)}#toast.bad{background:var(--warn)}
+
+/* 마크다운 읽기 */
+.reader.md-mode #rd-prev,.reader.md-mode #rd-next,.reader.md-mode .pg{display:none}
+.pct{display:none;min-width:48px;font-size:14px;padding-left:10px}.reader.md-mode .pct{display:inline}
+.reader.md-mode .rd-view{background:#f6f3ec;display:block}
+.md{max-width:720px;margin:0 auto;padding:18px 18px 80px;color:var(--ink);font-size:17px;line-height:1.75;word-break:keep-all;overflow-wrap:anywhere;font-family:"Noto Serif KR","Nanum Myeongjo",Georgia,serif;background:#f6f3ec}
+.md[hidden]{display:none}
+.md h1,.md h2,.md h3,.md h4{font-family:system-ui,"Noto Sans KR",sans-serif;line-height:1.35;margin:1.4em 0 .5em}.md h1{font-size:1.5em}.md h2{font-size:1.3em;border-bottom:1px solid var(--line);padding-bottom:.2em}.md h3{font-size:1.12em}
+.md p{margin:.7em 0}.md ul,.md ol{padding-left:1.4em}.md li{margin:.25em 0}
+.md blockquote{margin:1em 0;padding:.2em 1em;border-left:4px solid #b9c7b6;background:#eef2ea;color:#454b40}
+.md code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.88em;background:#ebe6d9;border-radius:5px;padding:.1em .35em}
+.md pre{overflow:auto;background:#2b2e29;color:#eee;border-radius:10px;padding:12px 14px}.md pre code{background:none;color:inherit;padding:0}
+.md table{border-collapse:collapse;display:block;overflow:auto;margin:1em 0}.md th,.md td{border:1px solid var(--line);padding:6px 10px}.md th{background:#ece7da}
+.md hr{border:0;border-top:1px solid var(--line);margin:1.6em 0}.md a{color:var(--acc)}.md a.dead{color:inherit;text-decoration:none}
+#rd-canvas[hidden]{display:none}
