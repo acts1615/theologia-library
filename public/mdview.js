@@ -33,7 +33,7 @@ async function flush(keepalive) {
 }
 async function open({ fileId }) {
   const t = TL(); const file = t.fileById(fileId); if (!file) return; if (M) await close(true);
-  const w = t.work(file.workId);
+  const w = t.work(file.workId); window.__tlReadWork = w.id;
   const el = document.createElement('div'); el.className = 'reader md'; el.id = 'reader-md';
   el.innerHTML = `<div class="r-bar">
       <button class="btn sm" data-act="side-toggle" title="사이드바 접기·펴기" aria-label="사이드바 접기·펴기">☰</button>

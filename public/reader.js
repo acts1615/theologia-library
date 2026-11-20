@@ -45,7 +45,7 @@ async function open({ fileId, page, terms, best, pnum }) {
   if (/\.epub$/i.test(file.path || file.name || '') && window.TLEpub) { if (R) await close(true); return window.TLEpub.open({ fileId, page, terms }); }
   if (window.TLEpub && window.TLEpub.isOpen()) await window.TLEpub.close(true);
   if (R) await close(true);
-  const w = t.work(file.workId);
+  const w = t.work(file.workId); window.__tlReadWork = w.id;
   const el = document.createElement('div'); el.className = 'reader'; el.id = 'reader';
   const siblings = t.filesOf(w);
   el.innerHTML = `

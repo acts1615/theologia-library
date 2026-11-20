@@ -17,7 +17,7 @@ const base = () => `/api/epub/${encodeURIComponent(E.file.id)}`;
 async function open({ fileId, page, terms }) {
   const t = TL(); const file = t.fileById(fileId); if (!file) return;
   if (E) await close(true);
-  const w = t.work(file.workId); const siblings = t.filesOf(w);
+  const w = t.work(file.workId); window.__tlReadWork = w.id; const siblings = t.filesOf(w);
   const el = document.createElement('div'); el.className = 'reader ep'; el.id = 'reader-epub';
   el.innerHTML = `
     <div class="r-bar">
