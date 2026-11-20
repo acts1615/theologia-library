@@ -40,7 +40,7 @@ function createStore(dataDir) {
   function newWork(title, firstFile, extra = {}) {
     const w = {
       id: nid('w'), title, titleKey: L.normalized(title), author: '', publisher: '', year: '', isbn: '',
-      category: '', bibleBooks: [], tags: [], status: 'unread', currentPage: 0, totalPages: 0,
+      category: '', categories: [], bibleBooks: [], tags: [], status: 'unread', currentPage: 0, totalPages: 0,
       note: '', coverUrl: '', storeUrl: '', source: '', review: false, inList: false, createdAt: new Date().toISOString(), ...extra,
     };
     state.works.push(w);
@@ -152,8 +152,8 @@ function createStore(dataDir) {
   const fileById = (id) => state.files.find((f) => f.id === id);
 
   const EDITABLE = {
-    title: 's', author: 's', publisher: 's', year: 's', isbn: 's', category: 's', note: 's', coverUrl: 's', storeUrl: 's', source: 's',
-    status: 'status', currentPage: 'n', totalPages: 'n', review: 'b', inList: 'b', bibleBooks: 'a', tags: 'a',
+    title: 's', author: 's', publisher: 's', year: 's', isbn: 's', category: 's', kind: 's', note: 's', coverUrl: 's', storeUrl: 's', source: 's',
+    status: 'status', currentPage: 'n', totalPages: 'n', review: 'b', inList: 'b', bibleBooks: 'a', tags: 'a', categories: 'a',
   };
   function updateWork(id, patch) {
     const w = workById(id); if (!w) return null;
@@ -182,6 +182,7 @@ function createStore(dataDir) {
       for (const f of state.files) if (f.workId === id) f.workId = intoId;
       target.bibleBooks = [...new Set([...target.bibleBooks, ...w.bibleBooks])];
       target.tags = [...new Set([...target.tags, ...w.tags])];
+      target.categories = [...new Set([...(target.categories || []), ...(w.categories || []), ...(w.category && w.category !== target.category ? [w.category] : [])])].filter((c) => c !== target.category);
       if (!target.author && w.author) target.author = w.author;
       if (!target.note && w.note) target.note = w.note;
       state.works = state.works.filter((x) => x.id !== id);

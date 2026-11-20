@@ -9,7 +9,7 @@ const TONES = ['olive', 'rust', 'navy', 'plum', 'sand', 'char', 'blue', 'teal'];
 const S = {
   lib: { folders: [], works: [], files: [] }, ref: { bibleBooks: [], categories: [] }, settings: {},
   sideOff: (() => { try { return localStorage.getItem('tl.sideOff') === '1'; } catch (e) { return false; } })(),
-  nav: 'all', category: '', bible: '', bibleOpen: {}, q: '', sort: 'read', mode: 'meta', tq: '', tscope: 'filter', tRan: false, noText: null, view: (() => { try { return localStorage.getItem('tl.view') || 'card'; } catch (e) { return 'card'; } })(), open: null, checked: new Set(), limit: 120,
+  nav: 'all', kind: '', category: '', bible: '', bibleOpen: {}, q: '', sort: 'read', mode: 'meta', tq: '', tscope: 'filter', tRan: false, noText: null, view: (() => { try { return localStorage.getItem('tl.view') || 'card'; } catch (e) { return 'card'; } })(), open: null, checked: new Set(), limit: 120,
   busy: '', refreshing: false, saveState: '',
 };
 let filesBy = new Map(); // workId -> files[]
@@ -40,6 +40,9 @@ function reindex() {
   for (const id of [...S.checked]) if (!S.lib.works.some((w) => w.id === id)) S.checked.delete(id);
 }
 const work = (id) => S.lib.works.find((w) => w.id === id);
+const PAPER_CATS = new Set(['학위 논문', '신학 논문']);
+const kindOf = (w) => (w.kind === '논문' || w.kind === '책') ? w.kind : (PAPER_CATS.has(w.category) ? '논문' : '책');
+const catsOf = (w) => [...new Set([w.category, ...(w.categories || [])].filter(Boolean))];
 const filesOf = (w) => filesBy.get(w.id) || [];
 const hasMissing = (w) => filesOf(w).some((f) => f.missing);
 const needsCheck = (w) => w.review || hasMissing(w);
@@ -58,10 +61,11 @@ function visibleWorks(noQ) {
     if (S.nav === 'notext' && !(S.noText && S.noText.has(w.id))) return false;
     if (S.nav === 'unmatched' && (w.isbn || w.fillState === 'done')) return false;
     if (S.nav === 'lowclass' && !(w.classSource === 'auto' && w.classConf === 'low')) return false;
-    if (S.category === '__none' ? w.category : S.category && w.category !== S.category) return false;
+    if (S.kind && kindOf(w) !== S.kind) return false;
+    if (S.category === '__none' ? catsOf(w).length : S.category && !catsOf(w).includes(S.category)) return false;
     if (S.bible && !w.bibleBooks.includes(S.bible)) return false;
     if (toks.length) {
-      const hay = [w.title, w.author, w.publisher, w.isbn, w.year, w.category, w.note, w.tags.join(' '), w.bibleBooks.join(' '), filesOf(w).map((f) => f.name).join(' ')].join(' ').toLowerCase();
+      const hay = [w.title, w.author, w.publisher, w.isbn, w.year, catsOf(w).join(' '), w.note, w.tags.join(' '), w.bibleBooks.join(' '), filesOf(w).map((f) => f.name).join(' ')].join(' ').toLowerCase();
       if (!toks.every((t) => hay.includes(t))) return false;
     }
     return true;
@@ -125,10 +129,10 @@ function isBibleOpen(t) {
 function renderSide() {
   const w = S.lib.works;
   const cnt = { all: w.length, readlist: 0, reading: 0, unread: 0, finished: 0, review: 0 };
-  const cats = new Map(); let none = 0, low = 0; const bcount = new Map();
+  const cats = new Map(); let none = 0, low = 0; const bcount = new Map(); const kcnt = { '책': 0, '논문': 0 };
   for (const x of w) {
-    cnt[x.status]++; if (x.inList) cnt.readlist++; if (needsCheck(x)) cnt.review++;
-    if (x.category) cats.set(x.category, (cats.get(x.category) || 0) + 1); else none++;
+    kcnt[kindOf(x)]++; cnt[x.status]++; if (x.inList) cnt.readlist++; if (needsCheck(x)) cnt.review++;
+    const cs = catsOf(x); if (cs.length) for (const c of cs) cats.set(c, (cats.get(c) || 0) + 1); else none++;
     if (x.classSource === 'auto' && x.classConf === 'low') low++;
     for (const b of x.bibleBooks || []) bcount.set(b, (bcount.get(b) || 0) + 1);
   }
@@ -154,6 +158,8 @@ function renderSide() {
     <h6>서재</h6>
     ${nav('all', '전체 문헌', cnt.all)}${nav('readlist', '★ 읽기 목록', cnt.readlist)}${nav('reading', '읽는 중', cnt.reading)}${nav('unread', '읽을 예정', cnt.unread)}${nav('finished', '완독', cnt.finished)}${nav('review', '확인 필요', cnt.review, true)}
     ${S.settings && S.settings.notesDir ? '<h6>노트</h6><button class="nav" data-act="note-search"><span>✎ 노트 검색</span></button>' : ''}
+    <h6>종류</h6>
+    <button class="nav ${S.kind === '책' ? 'on' : ''}" data-act="kind" data-v="책"><span>📚 책</span><span class="n">${num(kcnt['책'])}</span></button><button class="nav ${S.kind === '논문' ? 'on' : ''}" data-act="kind" data-v="논문"><span>📄 논문</span><span class="n">${num(kcnt['논문'])}</span></button>
     <h6>성경 66권</h6>
     ${bHead('old', '구약 39권')}${bHead('new', '신약 27권')}
     ${S.noText && S.noText.size ? `<h6>본문 검색</h6>${nav('notext', '본문 없음 (스캔본)', S.noText.size)}` : ''}
@@ -196,7 +202,7 @@ function row(w) {
     <td class="c-chk"><input type="checkbox" data-act="check" data-v="${w.id}" ${S.checked.has(w.id) ? 'checked' : ''} aria-label="선택" /></td>
     <td class="c-star"><button class="star ${w.inList ? 'on' : ''}" data-act="toggle-list" data-v="${w.id}" title="${w.inList ? '읽기 목록에서 빼기' : '읽기 목록에 넣기'}">${w.inList ? '★' : '☆'}</button></td>
     <td class="c-title"><b>${esc(w.title)}</b>${hasMissing(w) ? ' <span class="chip warn">파일 없음</span>' : ''}${w.review ? ' <span class="chip warn">그룹 확인</span>' : ''}<div>${locBtn(w, 'sm')}</div></td>
-    <td class="c-au">${esc(w.author || '')}</td><td class="c-cat">${esc(w.category || '')}</td>
+    <td class="c-au">${esc(w.author || '')}</td><td class="c-cat">${esc(catsOf(w).join(' · '))}</td>
     <td class="c-st"><span class="chip ${w.status}">${STATUS[w.status]}</span></td>
     <td class="c-pg">${w.totalPages > 0 ? `<div class="prog"><i style="width:${p}%"></i></div><small>${p}%</small>` : ''}</td>
     <td class="c-n">${files.length}</td><td class="c-rdt">${readBtn(w, 'rd')}</td></tr>`;
@@ -206,6 +212,7 @@ const NAVLABEL = { reading: '읽는 중', unread: '읽을 예정', finished: '�
 function scopeInfo() {
   const parts = [];
   if (S.nav !== 'all' && NAVLABEL[S.nav]) parts.push(NAVLABEL[S.nav]);
+  if (S.kind) parts.push(S.kind);
   if (S.category) parts.push(S.category === '__none' ? '분류 없음' : S.category);
   if (S.bible) parts.push(S.bible);
   if (S.tscope === 'open' && S.open && work(S.open)) return { ids: [S.open], label: '이 책: ' + work(S.open).title, key: 'open:' + S.open };
@@ -346,7 +353,7 @@ function renderDrawer() {
   dr.hidden = false;
   const files = filesOf(w), missing = files.filter((f) => f.missing).length;
   if (window.TLReader) setTimeout(() => window.TLReader.measure(files), 200);
-  const catNames = [...new Set([...S.ref.categories.map((c) => c.name), ...S.lib.works.map((x) => x.category).filter(Boolean)])];
+  const catNames = [...new Set([...S.ref.categories.map((c) => c.name), ...S.lib.works.flatMap((x) => catsOf(x))])];
   dr.innerHTML = `
   <div class="d-head"><span id="savestate">${esc(S.saveState)}</span><span class="d-actions"><button class="btn sm primary" data-act="save-now" title="지금 저장 (Ctrl+S)">저장</button><button class="icon-btn" data-act="close" title="닫기 (Esc)">✕</button></span></div>
   <div class="d-body" data-id="${w.id}">
@@ -368,8 +375,11 @@ function renderDrawer() {
       <div class="field"><label>출판연도</label><input data-f="year" value="${esc(w.year)}" /></div>
       <div class="field"><label>ISBN</label><input data-f="isbn" value="${esc(w.isbn)}" placeholder="978… (하이픈 있어도 됩니다)" /></div>
       <div class="isbnbar"><button class="btn sm" data-act="fill-isbn">ISBN으로 채우기</button><button class="btn sm" data-act="find-isbn">PDF에서 ISBN 찾기</button></div>
+      <div class="field"><label>종류</label><select data-f="kind"><option value="책" ${kindOf(w) === '책' ? 'selected' : ''}>책</option><option value="논문" ${kindOf(w) === '논문' ? 'selected' : ''}>논문</option></select></div>
       <div class="field"><label>분류</label><input data-f="category" list="cats" value="${esc(w.category)}" placeholder="예: 조직신학" /><datalist id="cats">${catNames.map((c) => `<option value="${esc(c)}">`).join('')}</datalist></div>
       ${w.classSource === 'auto' && w.category ? `<div class="clsnote ${w.classConf === 'low' ? 'low' : ''}"><span>자동 분류 · 확신 ${w.classConf === 'low' ? '낮음' : '높음'}${w.classReason ? ' · ' + esc(w.classReason) : ''}</span><button class="btn sm" data-act="confirm-class">맞아요</button></div>` : w.classSource === 'manual' ? '<div class="clsnote ok"><span>직접 지정한 분류</span></div>' : ''}
+      <div class="field" style="align-items:start"><label>추가 분류</label><div class="tags" id="xcats">${xcatsHtml(w)}</div></div>
+      <p class="help" style="margin:-4px 0 8px">한 책을 여러 분류에 넣을 수 있습니다. 예: 조직신학 + 논문. 위 ‘분류’는 대표 분류이고, 추가 분류는 사이드바 분류 목록에도 함께 잡힙니다.</p>
       <button class="btn sm" data-act="bookstore">서점 정보로 채우기</button>
       ${w.fillState === 'nomatch' ? '<p class="help" style="margin-top:6px">자동으로 같은 책을 확실히 찾지 못했습니다. 위 버튼으로 직접 골라 주세요.</p>' : ''}
     </div>
@@ -394,6 +404,7 @@ function renderDrawer() {
     <div class="d-actions"><button class="btn danger sm" data-act="del-work">서재에서 제거</button></div>
   </div>`;
 }
+const xcatsHtml = (w) => (w.categories || []).map((c, i) => `<span class="tag">${esc(c)}<button data-act="rm-xcat" data-v="${i}" title="삭제">✕</button></span>`).join('') + '<button class="tag-add" data-act="add-xcat">＋ 분류 추가</button>';
 const tagsHtml = (w) => w.tags.map((t, i) => `<span class="tag">${esc(t)}<button data-act="rm-tag" data-v="${i}" title="삭제">✕</button></span>`).join('') + '<button class="tag-add" data-act="add-tag">＋ 태그</button>';
 
 // ---------- 저장 ----------
@@ -739,6 +750,7 @@ document.addEventListener('click', async (e) => {
   switch (act) {
     case 'side-toggle': setSide(!S.sideOff); break;
     case 'nav': S.nav = v; S.category = ''; S.bible = ''; S.limit = 120; renderList(); renderSide(); break;
+    case 'kind': S.kind = S.kind === v ? '' : v; S.limit = 120; renderList(); renderSide(); break;
     case 'cat': S.category = v; S.nav = 'all'; S.bible = ''; S.limit = 120; renderList(); renderSide(); break;
     case 'bbook': S.bible = S.bible === v ? '' : v; S.nav = 'all'; S.category = ''; S.limit = 120; renderBibleSelect(); renderList(); renderSide(); break;
     case 'btoggle': S.bibleOpen[v] = !isBibleOpen(v); renderSide(); break;
@@ -749,9 +761,9 @@ document.addEventListener('click', async (e) => {
     case 'bulk-list': { const on = v === '1'; for (const id of S.checked) queueSave(id, { inList: on }); toast(`${S.checked.size}권을 읽기 목록${on ? '에 넣었습니다' : '에서 뺐습니다. (읽는 중·읽을 예정 같은 읽기 상태는 그대로입니다)'}.`); S.checked.clear(); renderList(); renderSide(); break; }
     case 'bulk-cat': {
       const ids = [...S.checked]; if (!ids.length) break;
-      const names = [...new Set([...S.ref.categories.map((c) => c.name), ...S.lib.works.map((x) => x.category).filter(Boolean)])].sort((a, b) => a.localeCompare(b, 'ko'));
-      modal('분류 바꾸기', `<p>선택한 ${num(ids.length)}권의 분류를 한꺼번에 바꿉니다.</p><div class="field" style="grid-template-columns:70px 1fr"><label>분류</label><input id="bc-in" list="bc-list" placeholder="목록에서 고르거나 직접 입력" autocomplete="off"><datalist id="bc-list">${names.map((c) => `<option value="${esc(c)}">`).join('')}</datalist></div><p class="help">직접 지정한 분류는 자동 분류를 다시 돌려도 바뀌지 않습니다. 비워 두고 누르면 분류를 지웁니다.</p>`,
-        [{ label: '취소' }, { label: '바꾸기', cls: 'primary', fn: (m) => { const v = m.querySelector('#bc-in').value.trim(); for (const id of ids) queueSave(id, { category: v }); toast(`${num(ids.length)}권의 분류를 ${v ? `'${v}'(으)로` : '비우는 것으로'} 바꿨습니다.`); S.checked.clear(); renderList(); renderSide(); } }]);
+      const names = [...new Set([...S.ref.categories.map((c) => c.name), ...S.lib.works.flatMap((x) => catsOf(x))])].sort((a, b) => a.localeCompare(b, 'ko'));
+      modal('분류 바꾸기', `<p>선택한 ${num(ids.length)}권의 분류를 한꺼번에 정합니다.</p><p style="margin:4px 0 8px"><label style="margin-right:14px"><input type="radio" name="bc-mode" value="set" checked> 대표 분류를 바꾸기</label><label style="margin-right:14px"><input type="radio" name="bc-mode" value="add"> 추가 분류로 더하기</label><label><input type="radio" name="bc-mode" value="kind"> 종류 정하기 (입력칸에 책 또는 논문)</label></p><div class="field" style="grid-template-columns:70px 1fr"><label>분류</label><input id="bc-in" list="bc-list" placeholder="목록에서 고르거나 직접 입력" autocomplete="off"><datalist id="bc-list">${names.map((c) => `<option value="${esc(c)}">`).join('')}</datalist></div><p class="help">직접 지정한 분류는 자동 분류를 다시 돌려도 바뀌지 않습니다. 비워 두고 누르면 분류를 지웁니다.</p>`,
+        [{ label: '취소' }, { label: '바꾸기', cls: 'primary', fn: (m) => { const v = m.querySelector('#bc-in').value.trim(); const mode = m.querySelector('input[name=bc-mode]:checked').value; const addMode = mode === 'add'; if (mode === 'kind') { if (v !== '책' && v !== '논문') { toast('종류는 책 또는 논문으로 입력해 주세요.', true); return true; } for (const id of ids) queueSave(id, { kind: v }); toast(`${num(ids.length)}권의 종류를 '${v}'로 정했습니다.`); } else if (addMode) { if (!v) { toast('더할 분류를 입력해 주세요.', true); return true; } for (const id of ids) { const w = work(id); if (w && v !== w.category && !(w.categories || []).includes(v)) queueSave(id, { categories: [...(w.categories || []), v] }); } toast(`${num(ids.length)}권에 추가 분류 '${v}'를 더했습니다.`); } else { for (const id of ids) queueSave(id, { category: v }); toast(`${num(ids.length)}권의 분류를 ${v ? `'${v}'(으)로` : '비우는 것으로'} 바꿨습니다.`); } S.checked.clear(); renderList(); renderSide(); } }]);
       break;
     }
     case 'bulk-status': { const n = S.checked.size; const label = { unread: '읽을 예정', reading: '읽는 중', finished: '완독' }[v]; for (const id of S.checked) queueSave(id, { status: v }); toast(`${n}권을 '${label}'(으)로 옮겼습니다.`); S.checked.clear(); renderList(); renderSide(); break; }
@@ -777,6 +789,15 @@ document.addEventListener('click', async (e) => {
     case 'bookstore': bookstoreModal(work(S.open)); break;
     case 'fill-isbn': fillByIsbn(S.open); break;
     case 'find-isbn': findIsbnInPdf(S.open); break;
+    case 'add-xcat': {
+      t.outerHTML = '<input class="tag-in" id="xcatin" list="cats" placeholder="분류 입력 후 Enter (예: 논문)" />';
+      const inp = $('#xcatin'); inp.focus();
+      const commit = () => { const val = inp.value.trim(); const w = work(S.open); if (val && w && val !== w.category && !(w.categories || []).includes(val)) queueSave(w.id, { categories: [...(w.categories || []), val] }); renderDrawer(); renderList(); renderSide(); };
+      inp.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); commit(); } if (ev.key === 'Escape') renderDrawer(); });
+      inp.addEventListener('blur', commit);
+      break;
+    }
+    case 'rm-xcat': { const w = work(S.open); queueSave(w.id, { categories: (w.categories || []).filter((_, i) => i !== +v) }); renderDrawer(); renderList(); renderSide(); break; }
     case 'add-tag': {
       t.outerHTML = '<input class="tag-in" id="tagin" placeholder="태그 입력 후 Enter" />';
       const inp = $('#tagin'); inp.focus();
@@ -807,7 +828,7 @@ document.addEventListener('input', (e) => {
     const p = $('#pct'); if (p) p.textContent = w.totalPages > 0 ? pct(w) + '%' : '';
     if (w.totalPages > 0 && w.currentPage >= w.totalPages && w.status !== 'finished') { queueSave(w.id, { status: 'finished' }); renderDrawer(); }
     else if (f === 'currentPage' && val > 0 && w.status === 'unread') { queueSave(w.id, { status: 'reading' }); renderDrawer(); }
-  } else queueSave(w.id, { [f]: val });
+  } else { queueSave(w.id, { [f]: val }); if (f === 'kind') { w.kind = val; renderSide(); } }
   clearTimeout(window.__lt); window.__lt = setTimeout(renderList, 300);
 });
 document.addEventListener('keydown', (e) => {
