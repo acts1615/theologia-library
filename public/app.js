@@ -506,17 +506,20 @@ async function bookstoreModal(w) {
     if (my !== seq || !$('#modal')) return;
     const real = r.candidates.filter((c) => c.sourceStatus === 'live'), links = r.candidates.filter((c) => c.sourceStatus === 'search-link'), unconf = r.candidates.filter((c) => c.sourceStatus === 'unconfigured');
     box.innerHTML = `
-      <p class="help">ISBN이 있으면 ISBN으로, 없으면 제목으로 검색합니다. 서점 검색 페이지에서 찾은 ISBN을 위 칸에 붙여넣고 다시 검색하세요. 고르면 표지와 서지 정보가 작품에 반영됩니다.</p>
+      <p class="help">서점 검색 페이지에서 복사한 ISBN을 위 ISBN 칸에 붙여넣으면 바로 검색됩니다. 책이 나오면 “적용”을 누르세요.</p>
+      ${isbn ? `<div class="cand"><div class="ci"><b>ISBN ${esc(isbn)}</b><small>찾은 책이 없거나 정보를 따로 채우고 싶을 때, 이 ISBN을 작품에 저장하고 서점에서 빈 항목만 채웁니다.</small></div><button class="btn sm" id="bs-save-isbn" type="button">이 ISBN 저장</button></div>` : ''}
       ${unconf.length ? `<div class="note-warn">${unconf.map((c) => esc(c.providerLabel)).join('·')} 검색을 쓰려면 설정에서 API 키를 입력해 주세요.</div>` : ''}
       ${(r.errors || []).map((e) => `<div class="note-warn">${esc(e)}</div>`).join('')}
       ${real.length ? real.map((c, i) => `<div class="cand">${c.coverUrl ? `<img src="${esc(c.coverUrl)}" alt="">` : '<img alt="">'}<div class="ci"><b>${esc(c.title)}</b><small>${esc(c.author || '')} · ${esc(c.publisher || '')} ${c.publishedAt ? '· ' + esc(String(c.publishedAt).slice(0, 10)) : ''}</small><small>${esc(c.providerLabel)}${c.isbn ? ' · ISBN ' + esc(c.isbn) : ''}</small></div><button class="btn sm primary" data-c="${i}">적용</button></div>`).join('') : '<p class="help">검색된 도서가 없습니다.</p>'}
       ${links.map((c) => `<div class="cand"><div class="ci"><b>${esc(c.providerLabel)}</b><small>공식 검색 API가 없어 검색 페이지로 연결합니다.</small></div><a class="btn sm" href="${esc(c.productUrl)}" target="tlstore" rel="noopener">검색 페이지 열기</a></div>`).join('')}`;
+    const sv = box.querySelector('#bs-save-isbn'); if (sv) sv.addEventListener('click', () => { closeModal(); fillByIsbn(w.id, isbn); });
     box.querySelectorAll('[data-c]').forEach((b) => b.addEventListener('click', async () => {
-      try { const c = real[+b.dataset.c]; const out = await api(`/api/library/works/${encodeURIComponent(w.id)}/apply-candidate`, 'POST', { candidate: c }); Object.assign(work(w.id), out.work); closeModal(); renderAll(); toast(`${c.providerLabel} 정보를 반영했습니다.`); }
+      try { const c = { ...real[+b.dataset.c] }; if (isbn && !c.isbn) c.isbn = isbn; const out = await api(`/api/library/works/${encodeURIComponent(w.id)}/apply-candidate`, 'POST', { candidate: c }); Object.assign(work(w.id), out.work); closeModal(); renderAll(); toast(`${c.providerLabel} 정보를 반영했습니다.`); }
       catch (e) { toast(e.message, true); }
     }));
   }
   m.querySelector('#bs-go').addEventListener('click', run);
+  isbnEl.addEventListener('paste', () => setTimeout(() => { if (isbnEl.value.replace(/[^0-9Xx]/g, '').length >= 10) run(); }, 60));
   [titleEl, isbnEl].forEach((el) => el.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); run(); } }));
   run();
 }
