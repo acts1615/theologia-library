@@ -1,4 +1,4 @@
-import { plugin, isNative, fileUrl, appPlugin } from './native.js';
+import { plugin, isNative, fileUrl, appPlugin, updaterPlugin } from './native.js';
 import { marked } from 'marked';
 const fs = require('fs');
 const { createStore } = require('../../store.js');
@@ -11,7 +11,7 @@ marked.use({ gfm: true, breaks: false, renderer: {
 const $ = (s, r = document) => r.querySelector(s);
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const num = (n) => Number(n).toLocaleString('ko-KR');
-const VER = '0.1.4';
+const VER = '0.1.5';
 let store, trees = {}, uris = {};
 const S = { cat: '', q: '', sort: 'name', shown: 80 };
 
@@ -240,9 +240,26 @@ async function checkUpdate(manual) {
     if (a && m && newer(m[1], VER)) { UPD = { v: m[1], url: a.browser_download_url }; toast(`새 버전 ${m[1]}이 있습니다. 설정에서 받을 수 있습니다.`); }
     else { UPD = null; if (manual) toast('최신 버전입니다.'); }
   } catch { if (manual) toast('새 버전을 확인하지 못했습니다. 인터넷 연결을 확인해 주세요.', true); }
+  showUpdBar();
   if (!$('#sheet').hidden && !$('#sheet').dataset.id) openSettings();
 }
 
+async function applyUpdate() {
+  if (!UPD) return;
+  const up = updaterPlugin();
+  if (!up) { window.open(UPD.url, '_blank'); return; }
+  toast('새 버전을 내려받는 중입니다… (약 6MB)');
+  try { await up.install({ url: UPD.url }); toast('설치 화면에서 “설치”를 눌러 주세요.'); }
+  catch (e) {
+    const m = String((e && e.message) || e);
+    if (/need-permission/.test(m)) toast('이 앱이 새 버전을 설치할 수 있게 “허용”을 켠 뒤, 돌아와서 다시 눌러 주세요.', true);
+    else toast('내려받지 못했습니다. 인터넷 연결을 확인하거나, 설정의 “브라우저로 받기”를 써 주세요.', true);
+  }
+}
+function showUpdBar() {
+  const bar = $('#updbar'); if (!bar) return;
+  if (UPD) { bar.hidden = false; bar.innerHTML = `<span>새 버전 ${esc(UPD.v)}이 나왔습니다</span><button class="btn pri" id="upd-go">업데이트</button>`; } else { bar.hidden = true; bar.innerHTML = ''; }
+}
 // ---------- 설정 ----------
 function openSettings() {
   const { folders, files } = data();
@@ -250,7 +267,7 @@ function openSettings() {
   $('#sheet-body').innerHTML = `<h2>설정</h2><h3>불러온 폴더</h3>
     ${folders.length ? folders.map((f) => `<div class="file"><div class="fn">${esc(f.path)}<small>${num(cnt(f.path))}개 파일</small></div><button class="btn" data-rescan="${esc(f.path)}">다시 읽기</button><button class="btn warn" data-rmfolder="${esc(f.path)}">제거</button></div>`).join('') : '<p class="sub">아직 없습니다.</p>'}
     <button class="btn pri full" id="s-add">폴더 추가</button>
-    <h3>업데이트</h3>${UPD ? `<p class="sub">새 버전 ${UPD.v}이 있습니다. 받은 파일을 열어 설치하면 책 기록은 그대로 유지됩니다.</p><a class="btn pri full" href="${esc(UPD.url)}" target="_blank" rel="noopener">새 버전 받기 (${UPD.v})</a>` : `<button class="btn full" id="s-upd">새 버전 확인</button>`}
+    <h3>업데이트</h3>${UPD ? `<p class="sub">새 버전 ${UPD.v}이 있습니다. 누르면 내려받고 설치 화면이 열립니다. 설치 화면에서 “설치”만 누르면 책 기록은 그대로 유지됩니다.</p><button class="btn pri full" id="s-apply">새 버전 ${UPD.v} 설치하기</button><a class="sub" href="${esc(UPD.url)}" target="_blank" rel="noopener">안 되면 브라우저로 받기</a>` : `<button class="btn full" id="s-upd">새 버전 확인</button>`}
     <h3>정보</h3><p class="sub">Theologia Library 모바일 ${VER} · 좋은군사 · MIT 라이선스<br>폴더를 제거해도 폰의 책 파일은 지워지지 않습니다.<br>책을 열면 앱 임시 저장 공간에 복사본이 잠시 생깁니다.</p>
     <button class="btn full" id="s-cache">임시 복사본 지우기</button><button class="btn full" id="d-close">닫기</button>`;
   $('#sheet').hidden = false; $('#sheet').dataset.id = '';
@@ -269,6 +286,7 @@ document.addEventListener('click', async (e) => {
   if (t.id === 'btn-sort') { S.sort = S.sort === 'name' ? 'recent' : 'name'; t.textContent = S.sort === 'name' ? '이름순' : '최근 읽음순'; return renderList(); }
   if (t.dataset.rescan) { closeDetail(); return scanFolder(t.dataset.rescan); }
   if (t.dataset.rmfolder) { store.removeFolder(t.dataset.rmfolder); for (const k of Object.keys(uris)) if (k.startsWith(t.dataset.rmfolder + '/')) delete uris[k]; delete trees[t.dataset.rmfolder]; saveMaps(); store.flush(); closeDetail(); render(); toast('목록에서 제거했습니다. 폰의 파일은 그대로입니다.'); return; }
+  if (t.id === 's-apply' || t.id === 'upd-go') { applyUpdate(); return; }
   if (t.id === 's-upd') { toast('확인하는 중…'); return checkUpdate(true); }
   if (t.id === 's-cache') { try { await plugin().clearCache(); toast('임시 복사본을 지웠습니다.'); } catch { toast('지우지 못했습니다.', true); } return; }
   if (t.id === 'rd-prev') return go(R.page - 1);

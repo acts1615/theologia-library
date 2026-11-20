@@ -11,3 +11,6 @@ export function plugin() {
 export const isNative = () => !!(window.__MOCK_FOLDER || Capacitor.isNativePlatform());
 export function fileUrl(p) { return Capacitor.isNativePlatform() ? Capacitor.convertFileSrc(p) : p; }
 export function appPlugin() { try { return Capacitor.isNativePlatform() ? registerPlugin('App') : null; } catch { return null; } }
+
+let updater = null;
+export function updaterPlugin() { try { if (!Capacitor.isNativePlatform()) return null; if (!updater) updater = registerPlugin('Updater'); return updater; } catch { return null; } }
