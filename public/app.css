@@ -353,3 +353,12 @@ body.rn-open .reader{right:380px}
 .rn-save{font-size:12px;color:#6d7b5a}.rn-tools{display:flex;gap:6px;padding:8px 12px}
 .rn-text{flex:1;margin:0 12px;border:1px solid #0003;border-radius:8px;padding:10px;font:14px/1.7 "Noto Sans KR",sans-serif;resize:none;background:#fff;color:#222}
 .rn-foot{padding:8px 12px;font-size:11.5px;color:#8a8e84}
+
+/* 입력칸 글자색·바탕색을 항상 분명하게(윈도우 다크 모드 등에서 글자가 배경에 묻히는 문제 방지) */
+:root{color-scheme:light}
+input,textarea,select{background-color:#fff;color:#2d302b;-webkit-text-fill-color:#2d302b;caret-color:#2d302b;color-scheme:light}
+input::placeholder,textarea::placeholder{color:#9b9f96;-webkit-text-fill-color:#9b9f96;opacity:1}
+input:disabled,textarea:disabled{-webkit-text-fill-color:#7d8178;background-color:#f1f1ec}
+#drawer textarea[data-f=note]{min-height:220px;font-size:14px;line-height:1.7;padding:10px 12px;border:1px solid var(--line-strong);border-radius:8px}
+#drawer textarea[data-f=note]:focus{border-color:var(--olive);box-shadow:0 0 0 3px #6d7b5a22;outline:none}
+.nt-text,.rn-text{color:#2d302b;-webkit-text-fill-color:#2d302b;background-color:#fff}

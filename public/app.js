@@ -376,7 +376,7 @@ function renderDrawer() {
       <div class="tags">${w.bibleBooks.length ? w.bibleBooks.map((b) => `<span class="tag">${esc(b)}</span>`).join('') : '<span style="color:var(--faint)">연결된 성경 책이 없습니다</span>'}</div></div>
     <div class="sec"><h5>태그</h5><div class="tags" id="tags">${tagsHtml(w)}</div></div>
     <div class="sec"><h5>노트 ${S.settings && S.settings.notesDir ? '<button class="btn sm" data-act="note-open" data-v="' + esc(w.id) + '">책 노트 열기</button>' : ''}</h5>${S.settings && S.settings.notesDir ? '<p class="help">이 책의 노트를 노트 폴더에 md 파일로 씁니다. <code>[[주제]]</code>로 다른 노트와 이어집니다.</p>' : '<p class="help">설정에서 노트 폴더를 정하면 책마다 노트를 쓰고 <code>[[ ]]</code>로 이을 수 있습니다.</p>'}</div>
-    <div class="sec"><h5>메모</h5><textarea data-f="note" placeholder="읽은 소감, 인용할 쪽, 참고할 점…">${esc(w.note)}</textarea></div>
+    <div class="sec"><h5>메모 <small style="font-weight:400;color:var(--muted)">짧은 기록 · 길게 쓸 때는 위의 책 노트</small></h5><textarea data-f="note" placeholder="읽은 소감, 인용할 쪽, 참고할 점…">${esc(w.note)}</textarea></div>
     <div class="sec"><h5>위치</h5>${(locInfo(w) ? locInfo(w).list : []).map((g) => `
       <div class="locrow"><button class="loc ${g.file.missing ? 'warn' : ''}" data-act="show-pdf" data-v="${g.file.id}" title="눌러서 위치 보기">📁 <span>${esc(g.label)}</span></button>
         <div class="path">${esc(g.dir)}</div>
