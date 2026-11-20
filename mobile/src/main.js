@@ -1,4 +1,4 @@
-import { plugin, isNative, fileUrl } from './native.js';
+import { plugin, isNative, fileUrl, appPlugin } from './native.js';
 const fs = require('fs');
 const { createStore } = require('../../store.js');
 const CLS = require('../../classify.js');
@@ -6,7 +6,7 @@ const CLS = require('../../classify.js');
 const $ = (s, r = document) => r.querySelector(s);
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const num = (n) => Number(n).toLocaleString('ko-KR');
-const VER = '0.1.0';
+const VER = '0.1.1';
 let store, trees = {}, uris = {};
 const S = { cat: '', q: '', sort: 'name', shown: 80 };
 
@@ -89,7 +89,7 @@ function render() { renderChips(); renderList(); }
 // ---------- 폴더 불러오기 ----------
 async function addFolder() {
   const P = plugin();
-  if (!P) { toast('안드로이드 앱에서만 폴더를 고를 수 있습니다.', true); return; }
+  if (!P) { toast('폴더 선택 기능을 찾지 못했습니다. 앱을 완전히 닫았다가 다시 열어 주세요.', true); return; }
   let tree;
   try { tree = await P.pick(); } catch (e) { if (!/cancel/i.test(String(e && e.message || e))) toast('폴더를 고르지 못했습니다.', true); return; }
   trees[tree.name] = tree.uri; saveMaps();
@@ -229,8 +229,8 @@ document.addEventListener('touchend', (e) => {
 }, { passive: true });
 // 안드로이드 뒤로 가기
 document.addEventListener('DOMContentLoaded', () => {
-  let A = null; try { A = window.Capacitor && window.Capacitor.registerPlugin ? window.Capacitor.registerPlugin('App') : null; } catch {}
-  if (A && A.addListener) A.addListener('backButton', () => { if (!$('#reader').hidden) closeReader(); else if (!$('#sheet').hidden) closeDetail(); });
+  const A = appPlugin();
+  if (A && A.addListener) A.addListener('backButton', () => { if (!$('#reader').hidden) closeReader(); else if (!$('#sheet').hidden) closeDetail(); else A.minimizeApp && A.minimizeApp(); });
 });
 
 // ---------- 시작 ----------

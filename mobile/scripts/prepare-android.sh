@@ -6,6 +6,10 @@ PKG_DIR=android/app/src/main/java/kr/goodsoldier/theologia/mobile
 mkdir -p "$PKG_DIR"
 cp android-src/FolderPlugin.java "$PKG_DIR/FolderPlugin.java"
 cp android-src/MainActivity.java "$PKG_DIR/MainActivity.java"
+# 서명: 매번 같은 키로 서명해야 새 APK를 지우지 않고 덮어 설치할 수 있다 (시험판용 공개 키)
+cp android-src/debug.keystore android/app/debug.keystore
+sed -i '0,/^android {/s//android {\n    signingConfigs {\n        debug {\n            storeFile file("debug.keystore")\n            storePassword "android"\n            keyAlias "androiddebugkey"\n            keyPassword "android"\n        }\n    }/' android/app/build.gradle
+grep -n -A8 "signingConfigs" android/app/build.gradle | head -12 || true
 # 앱 이름·버전
 VER=$(node -p "require('./package.json').version")
 CODE=$(node -p "const v=require('./package.json').version.split('.').map(Number); v[0]*10000+v[1]*100+v[2]")
