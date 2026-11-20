@@ -111,6 +111,24 @@ function listen(srv, port) {
 }
 
 
+
+// Electron은 오른쪽 클릭 메뉴(복사·붙여넣기)가 기본으로 없다. 직접 만들어 준다.
+function attachContextMenu(wc) {
+  wc.on('context-menu', (_e, p) => {
+    const items = [];
+    if (p.isEditable) {
+      items.push({ label: '잘라내기', role: 'cut', enabled: p.editFlags.canCut }, { label: '복사', role: 'copy', enabled: p.editFlags.canCopy }, { label: '붙여넣기', role: 'paste', enabled: p.editFlags.canPaste }, { type: 'separator' }, { label: '모두 선택', role: 'selectAll' });
+    } else if (p.selectionText && p.selectionText.trim()) {
+      items.push({ label: '복사', role: 'copy' }, { label: '모두 선택', role: 'selectAll' });
+    } else if (p.linkURL) {
+      items.push({ label: '링크 주소 복사', click: () => require('electron').clipboard.writeText(p.linkURL) });
+    } else {
+      items.push({ label: '모두 선택', role: 'selectAll' });
+    }
+    Menu.buildFromTemplate(items).popup();
+  });
+}
+
 // 서점 검색 페이지를 앱 안 창으로 연다. 사이트가 글자 복사를 막아도 ISBN을 복사할 수 있다.
 let storeWin = null;
 function openStoreWindow(url) {
@@ -120,7 +138,7 @@ function openStoreWindow(url) {
       width: 1100, height: 860, autoHideMenuBar: true, title: '서점 검색 — 글자를 드래그해 복사할 수 있습니다',
       webPreferences: { preload: path.join(__dirname, 'storepreload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true, partition: 'persist:tl-store' },
     });
-    const wc = storeWin.webContents;
+    const wc = storeWin.webContents; attachContextMenu(wc);
     wc.setWindowOpenHandler(({ url: u }) => { if (/^https?:/i.test(u)) storeWin.loadURL(u); return { action: 'deny' }; });
     wc.on('will-navigate', (e, u) => { if (!/^https?:/i.test(u)) e.preventDefault(); });
     storeWin.on('closed', () => { storeWin = null; });
@@ -135,12 +153,14 @@ async function start() {
   try { port = await listen(server, PREFERRED_PORT); } catch { port = await listen(server, 0); }
 
   L('main: server port=' + port);
-  Menu.setApplicationMenu(null);
+  // 메뉴 막대는 숨기되, 복사·붙여넣기 단축키(특히 맥)가 동작하도록 편집 메뉴만 둔다
+  Menu.setApplicationMenu(Menu.buildFromTemplate([{ label: '편집', submenu: [{ role: 'undo' }, { role: 'redo' }, { type: 'separator' }, { role: 'cut' }, { role: 'copy' }, { role: 'paste' }, { role: 'selectAll' }] }]));
   mainWindow = new BrowserWindow({
     width: 1360, height: 880, minWidth: 900, minHeight: 600,
     title: 'Theologia Library', backgroundColor: '#f6f6f1', autoHideMenuBar: true,
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true },
   });
+  attachContextMenu(mainWindow.webContents);
   mainWindow.webContents.setWindowOpenHandler(({ url, frameName }) => {
     if (!/^https?:/i.test(url)) return { action: 'deny' };
     if (frameName === 'tlstore') { openStoreWindow(url); return { action: 'deny' }; }   // 서점 검색 페이지: 복사 금지를 풀어 주는 앱 안 창

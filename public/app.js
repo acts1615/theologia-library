@@ -688,6 +688,8 @@ const fileById = (id) => S.lib.files.find((f) => f.id === id);
 document.addEventListener('click', async (e) => {
   const t = e.target.closest('[data-act]'); if (!t || $('#modal')?.contains(t)) return;
   const act = t.dataset.act, v = t.dataset.v;
+  // 글자를 드래그해서 선택한 뒤 손을 뗀 것이면 카드 열기 등으로 처리하지 않는다(선택이 사라지지 않게)
+  if ((act === 'open' || act === 'view') && !e.target.closest('button, input, a')) { const sel = window.getSelection(); if (sel && !sel.isCollapsed && String(sel).trim() && t.contains(sel.anchorNode)) return; }
   // 읽는 화면에서 왼쪽 목록을 누르면 읽는 화면을 닫고 그 목록으로 간다
   if (window.TLReader && window.TLReader.isOpen() && ['nav', 'cat', 'bbook'].includes(act) && t.closest('.side')) await window.TLReader.close();
   if (act === 'check') { e.stopPropagation(); v && (t.checked ? S.checked.add(v) : S.checked.delete(v)); renderList(); return; }
