@@ -11,7 +11,7 @@ marked.use({ gfm: true, breaks: false, renderer: {
 const $ = (s, r = document) => r.querySelector(s);
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const num = (n) => Number(n).toLocaleString('ko-KR');
-const VER = '0.1.3';
+const VER = '0.1.4';
 let store, trees = {}, uris = {};
 const S = { cat: '', q: '', sort: 'name', shown: 80 };
 
@@ -225,6 +225,24 @@ function mdProgress() {
 function mdSize(d) { MD.size = Math.min(30, Math.max(12, MD.size + d)); localStorage.setItem('mdsize', String(MD.size)); $('#md-view').style.fontSize = MD.size + 'px'; mdProgress(); }
 document.addEventListener('DOMContentLoaded', () => { $('#rd-view').addEventListener('scroll', mdProgress, { passive: true }); });
 
+// ---------- 새 버전 확인 (깃허브 최신 릴리스) ----------
+const REPO = 'acts1615/theologia-library';
+let UPD = null;
+const vnum = (v) => String(v).split('.').map((x) => parseInt(x, 10) || 0);
+const newer = (a, b) => { const x = vnum(a), y = vnum(b); for (let i = 0; i < 3; i++) { if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) > (y[i] || 0); } return false; };
+async function checkUpdate(manual) {
+  try {
+    const r = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, { headers: { Accept: 'application/vnd.github+json' } });
+    if (!r.ok) throw new Error(String(r.status));
+    const j = await r.json();
+    const a = (j.assets || []).find((x) => x.name === 'Theologia-Mobile.apk');
+    const m = a && /mobile-(\d+\.\d+\.\d+)/.exec(a.label || '');
+    if (a && m && newer(m[1], VER)) { UPD = { v: m[1], url: a.browser_download_url }; toast(`새 버전 ${m[1]}이 있습니다. 설정에서 받을 수 있습니다.`); }
+    else { UPD = null; if (manual) toast('최신 버전입니다.'); }
+  } catch { if (manual) toast('새 버전을 확인하지 못했습니다. 인터넷 연결을 확인해 주세요.', true); }
+  if (!$('#sheet').hidden && !$('#sheet').dataset.id) openSettings();
+}
+
 // ---------- 설정 ----------
 function openSettings() {
   const { folders, files } = data();
@@ -232,6 +250,7 @@ function openSettings() {
   $('#sheet-body').innerHTML = `<h2>설정</h2><h3>불러온 폴더</h3>
     ${folders.length ? folders.map((f) => `<div class="file"><div class="fn">${esc(f.path)}<small>${num(cnt(f.path))}개 파일</small></div><button class="btn" data-rescan="${esc(f.path)}">다시 읽기</button><button class="btn warn" data-rmfolder="${esc(f.path)}">제거</button></div>`).join('') : '<p class="sub">아직 없습니다.</p>'}
     <button class="btn pri full" id="s-add">폴더 추가</button>
+    <h3>업데이트</h3>${UPD ? `<p class="sub">새 버전 ${UPD.v}이 있습니다. 받은 파일을 열어 설치하면 책 기록은 그대로 유지됩니다.</p><a class="btn pri full" href="${esc(UPD.url)}" target="_blank" rel="noopener">새 버전 받기 (${UPD.v})</a>` : `<button class="btn full" id="s-upd">새 버전 확인</button>`}
     <h3>정보</h3><p class="sub">Theologia Library 모바일 ${VER} · 좋은군사 · MIT 라이선스<br>폴더를 제거해도 폰의 책 파일은 지워지지 않습니다.<br>책을 열면 앱 임시 저장 공간에 복사본이 잠시 생깁니다.</p>
     <button class="btn full" id="s-cache">임시 복사본 지우기</button><button class="btn full" id="d-close">닫기</button>`;
   $('#sheet').hidden = false; $('#sheet').dataset.id = '';
@@ -246,10 +265,11 @@ document.addEventListener('click', async (e) => {
   if (t.id === 'd-close') return closeDetail();
   if (t.dataset.read) return openFile(t.dataset.read);
   if (t.id === 'btn-add' || t.id === 'empty-add' || t.id === 's-add') { closeDetail(); return addFolder(); }
-  if (t.id === 'btn-settings') return openSettings();
+  if (t.id === 'btn-settings') { openSettings(); return; }
   if (t.id === 'btn-sort') { S.sort = S.sort === 'name' ? 'recent' : 'name'; t.textContent = S.sort === 'name' ? '이름순' : '최근 읽음순'; return renderList(); }
   if (t.dataset.rescan) { closeDetail(); return scanFolder(t.dataset.rescan); }
   if (t.dataset.rmfolder) { store.removeFolder(t.dataset.rmfolder); for (const k of Object.keys(uris)) if (k.startsWith(t.dataset.rmfolder + '/')) delete uris[k]; delete trees[t.dataset.rmfolder]; saveMaps(); store.flush(); closeDetail(); render(); toast('목록에서 제거했습니다. 폰의 파일은 그대로입니다.'); return; }
+  if (t.id === 's-upd') { toast('확인하는 중…'); return checkUpdate(true); }
   if (t.id === 's-cache') { try { await plugin().clearCache(); toast('임시 복사본을 지웠습니다.'); } catch { toast('지우지 못했습니다.', true); } return; }
   if (t.id === 'rd-prev') return go(R.page - 1);
   if (t.id === 'rd-next') return go(R.page + 1);
@@ -281,5 +301,6 @@ document.addEventListener('DOMContentLoaded', () => {
   try { store.classifyAll(); } catch {}
   $('#ver').textContent = VER;
   render();
+  setTimeout(() => checkUpdate(false), 1500);
   window.__app = { store, S, scanFolder, addFolder, openFile, render };
 })();

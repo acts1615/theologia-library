@@ -1,6 +1,6 @@
 {
   "name": "theologia-library-mobile",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "private": true,
   "description": "Theologia Library 안드로이드 앱 (폰 폴더의 PDF·EPUB을 한꺼번에 불러와 보는 서재)",
   "scripts": {

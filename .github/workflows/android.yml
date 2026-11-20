@@ -37,4 +37,6 @@ jobs:
       - name: 최신 릴리스에 붙이기
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "$(gh release view --json tagName -q .tagName)" Theologia-Mobile.apk --clobber || echo "릴리스가 없어 Artifacts 로만 올렸습니다."
+        run: |
+          V=$(node -p "require('./package.json').version")
+          gh release upload "$(gh release view --json tagName -q .tagName)" "Theologia-Mobile.apk#mobile-$V" --clobber || echo "릴리스가 없어 Artifacts 로만 올렸습니다."
