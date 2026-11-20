@@ -215,6 +215,21 @@ function createServer({ publicDir, dataDir, settingsDirs = [], restart = null })
         } catch (e) { return sendJson(res, 500, { error: 'EPUB을 열 수 없습니다: ' + String(e && e.message || e) }); }
       }
 
+      // 마크다운(.md): 본문 글자를 그대로 전달(화면에서 안전하게 변환)
+      if ((r = p.match(/^\/api\/md\/([^/]+)$/)) && m === 'GET') {
+        const host = String(req.headers.host || '');
+        const port = server.address().port;
+        if (host !== `127.0.0.1:${port}` && host !== `localhost:${port}`) { res.writeHead(403); return res.end(); }
+        const f = store.fileById(decodeURIComponent(r[1]));
+        if (!f || !/\.(?:md|markdown)$/i.test(f.path)) return sendJson(res, 404, { error: '파일을 찾을 수 없습니다.' });
+        try {
+          const st = await fs.promises.stat(f.path);
+          if (st.size > 8 * 1024 * 1024) return sendJson(res, 413, { error: '파일이 너무 큽니다(8MB 초과).' });
+          let t = await fs.promises.readFile(f.path, 'utf8'); if (t.charCodeAt(0) === 0xFEFF) t = t.slice(1);
+          return sendJson(res, 200, { text: t });
+        } catch { return sendJson(res, 404, { error: '파일이 없습니다. 이동되었거나 삭제되었을 수 있습니다.' }); }
+      }
+
       // 등록된 PDF를 쪽 단위(Range)로 전달 — 앱 안의 리더가 사용
       if ((r = p.match(/^\/api\/pdf\/([^/]+)$/)) && (m === 'GET' || m === 'HEAD')) {
         const host = String(req.headers.host || '');

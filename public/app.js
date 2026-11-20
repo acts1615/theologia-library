@@ -382,7 +382,7 @@ function renderDrawer() {
         <div class="btns"><button class="btn sm" data-act="show-pdf" data-v="${g.file.id}">위치 보기</button><button class="btn sm" data-act="copy-path" data-v="${g.file.id}">경로 복사</button></div></div>`).join('')}</div>
     <div class="sec"><h5>PDF 파일 ${files.length}개</h5>${files.map((f) => `
       <div class="file ${f.missing ? 'gone' : ''}">
-        <div class="fn"><b title="${esc(f.name)}">${esc(f.name)}</b><small title="${esc(f.path)}">${f.missing ? '파일 없음 · ' : ''}${fmtSize(f.size)}${/\.epub$/i.test(f.path) ? ` · EPUB${f.lastPage > 0 ? ` · ${Math.round(f.lastPage / 10)}% 읽음` : ''}` : f.pages > 0 ? ` · ${num(f.pages)}쪽${f.lastPage > 0 ? ` · ${f.lastPage}쪽까지 읽음` : ''}` : ''}</small></div>
+        <div class="fn"><b title="${esc(f.name)}">${esc(f.name)}</b><small title="${esc(f.path)}">${f.missing ? '파일 없음 · ' : ''}${fmtSize(f.size)}${/\.(?:md|markdown)$/i.test(f.path) ? ` · MD${f.lastPage > 0 ? ` · ${Math.round(f.lastPage / 10)}% 읽음` : ''}` : /\.epub$/i.test(f.path) ? ` · EPUB${f.lastPage > 0 ? ` · ${Math.round(f.lastPage / 10)}% 읽음` : ''}` : f.pages > 0 ? ` · ${num(f.pages)}쪽${f.lastPage > 0 ? ` · ${f.lastPage}쪽까지 읽음` : ''}` : ''}</small></div>
         <div class="acts">
           <button class="btn sm primary" data-act="read" data-v="${f.id}" ${f.missing ? 'disabled' : ''}>${f.lastPage > 0 ? `이어 읽기 p.${f.lastPage}` : '읽기'}</button>
           <button class="icon-btn" data-act="open-pdf" data-v="${f.id}" title="기본 PDF 뷰어로 열기" ${f.missing ? 'disabled' : ''}>↗</button>

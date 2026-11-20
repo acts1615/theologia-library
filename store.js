@@ -248,7 +248,7 @@ function createStore(dataDir) {
   }
   function filesOfWork(wid) { return state.files.filter((f) => f.workId === wid); }
   // 자동 분류: 사용자가 직접 지정한 값(classSource/bibleSource === 'manual')은 건드리지 않는다.
-  const CLS_VER = 7;
+  const CLS_VER = 8;
   function classifyAll(opts = {}) {
     let changed = 0, cat = 0, bible = 0;
     const byWork = new Map(); for (const f of state.files) { let a = byWork.get(f.workId); if (!a) byWork.set(f.workId, (a = [])); a.push(f.name); }
@@ -277,6 +277,12 @@ function createStore(dataDir) {
       { const ns = byWork.get(w.id) || [];
         if (ns.length && ns.every((n) => /\.(?:md|markdown)$/i.test(n))) {
           if (w.classSource !== 'manual') { w.category = 'MD 파일'; w.classSource = 'auto'; w.classConf = 100; w.classReason = 'md 파일'; cat++; }
+          w.classVer = CLS_VER; changed++; continue;
+        } }
+      // EPUB 파일만으로 된 작품은 'EPUB' 분류 하나로 모은다 (직접 고른 분류는 그대로 둔다)
+      { const ns = byWork.get(w.id) || [];
+        if (ns.length && ns.every((n) => /\.epub$/i.test(n))) {
+          if (w.classSource !== 'manual') { w.category = 'EPUB'; w.classSource = 'auto'; w.classConf = 100; w.classReason = 'epub 파일'; cat++; }
           w.classVer = CLS_VER; changed++; continue;
         } }
       const mg = L.magazineInfo(w.title, byWork.get(w.id) || []);

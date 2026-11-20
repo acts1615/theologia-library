@@ -315,3 +315,15 @@ body.side-off .side{display:none}
 body.side-off .upd{display:none}
 .upd.busy{gap:6px}.upd.err{border-color:#e0b4a8;background:#fff6f3}
 .upd-bar{height:6px;border-radius:4px;background:#0000001a;overflow:hidden}.upd-bar i{display:block;height:100%;background:var(--olive,#6d7b5a);transition:width .3s}
+
+/* 마크다운 리더 */
+.reader.md .md-wrap{flex:1;min-height:0;display:flex}
+.reader.md .md-view{flex:1;overflow:auto;padding:28px 18px 80px;outline:none}
+.reader.md .md-art{max-width:46em;margin:0 auto;line-height:1.85;word-break:keep-all;overflow-wrap:anywhere;font-family:"Noto Serif KR","Batang",serif}
+.md-art h1,.md-art h2,.md-art h3{line-height:1.35;margin:1.4em 0 .5em;font-family:inherit}
+.md-art h1{font-size:1.7em}.md-art h2{font-size:1.4em;border-bottom:1px solid #8884;padding-bottom:.2em}.md-art h3{font-size:1.18em}
+.md-art blockquote{margin:1em 0;padding:.4em 1em;border-left:4px solid #9bb59f;background:#8881}
+.md-art pre{background:#2b2d29;color:#eee;padding:12px 14px;border-radius:8px;overflow:auto}
+.md-art code{background:#8882;padding:.1em .35em;border-radius:4px;font-size:.9em}.md-art pre code{background:none;padding:0}
+.md-art table{border-collapse:collapse;margin:1em 0}.md-art th,.md-art td{border:1px solid #8886;padding:6px 10px}.md-art th{background:#8882}
+.md-art a{color:#2a6fb0}

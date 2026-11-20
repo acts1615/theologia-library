@@ -40,6 +40,8 @@ async function measure(files) {
 // ---------- 리더 ----------
 async function open({ fileId, page, terms, best, pnum }) {
   const t = TL(); const file = t.fileById(fileId); if (!file) return;
+  if (/\.(?:md|markdown)$/i.test(file.path || file.name || '') && window.TLMd) { if (R) await close(true); if (window.TLEpub && window.TLEpub.isOpen()) await window.TLEpub.close(true); return window.TLMd.open({ fileId }); }
+  if (window.TLMd && window.TLMd.isOpen()) await window.TLMd.close(true);
   if (/\.epub$/i.test(file.path || file.name || '') && window.TLEpub) { if (R) await close(true); return window.TLEpub.open({ fileId, page, terms }); }
   if (window.TLEpub && window.TLEpub.isOpen()) await window.TLEpub.close(true);
   if (R) await close(true);
@@ -616,5 +618,5 @@ async function close(silent) {
   if (!silent) TL().afterReader();
 }
 
-window.TLReader = { open, close: (s) => (window.TLEpub && window.TLEpub.isOpen() ? window.TLEpub.close(s) : close(s)), measure, pageText, isbnTexts, isOpen: () => !!R || !!(window.TLEpub && window.TLEpub.isOpen()), __state: () => R };
+window.TLReader = { open, close: (s) => (window.TLMd && window.TLMd.isOpen() ? window.TLMd.close(s) : window.TLEpub && window.TLEpub.isOpen() ? window.TLEpub.close(s) : close(s)), measure, pageText, isbnTexts, isOpen: () => !!R || !!(window.TLEpub && window.TLEpub.isOpen()) || !!(window.TLMd && window.TLMd.isOpen()), __state: () => R };
 })();

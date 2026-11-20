@@ -11,7 +11,7 @@ marked.use({ gfm: true, breaks: false, renderer: {
 const $ = (s, r = document) => r.querySelector(s);
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const num = (n) => Number(n).toLocaleString('ko-KR');
-const VER = '0.1.2';
+const VER = '0.1.3';
 let store, trees = {}, uris = {};
 const S = { cat: '', q: '', sort: 'name', shown: 80 };
 
