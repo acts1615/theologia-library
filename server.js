@@ -47,6 +47,19 @@ const { versionOf } = require('./version');
 function createServer({ publicDir, dataDir, settingsDirs = [], restart = null }) {
   const store = createStore(dataDir);
   try { store.classifyAll(); } catch (e) { console.error('classify failed', e.message); }
+  // 월간지(묵상과 설교·생명의삶플러스)는 이름에서 출판사와 연도를 채운다. 비어 있는 칸만 채우고, 직접 쓴 값은 건드리지 않는다.
+  function fillMagazines() {
+    let n = 0;
+    for (const w of store.snapshot().works) {
+      const mg = L.magazineInfo(w.title, store.filesOfWork(w.id).map((f) => f.name)); if (!mg) continue;
+      const patch = {};
+      if (mg.publisher && !w.publisher) patch.publisher = mg.publisher;
+      if (mg.year && !w.year) patch.year = mg.year;
+      if (Object.keys(patch).length) { store.updateWork(w.id, patch); n++; }
+    }
+    return n;
+  }
+  try { const n = fillMagazines(); if (n) console.log('월간지 정보 채움:', n); } catch (e) { console.error('magazine fill failed', e.message); }
   const settings = createSettings(dataDir, settingsDirs);
   const cur = (() => { try { const b = require('./build.json'); return { seq: Number(b.seq) || 0, version: versionOf(b.seq) }; } catch { return { seq: 0, version: versionOf(0) }; } })();
   const updater = createUpdater({ dataDir, current: cur, restart });
@@ -134,7 +147,7 @@ function createServer({ publicDir, dataDir, settingsDirs = [], restart = null })
         const folderPath = typeof b.folderPath === 'string' ? b.folderPath : '';
         const files = Array.isArray(b.files) ? b.files.filter((f) => f && typeof f.path === 'string' && typeof f.name === 'string') : [];
         if (!folderPath) return sendJson(res, 400, { error: 'folderPath가 필요합니다.' });
-        const summary = store.scan(folderPath, files, { unavailable: b.unavailable === true }); try { store.classifyAll(); } catch {}
+        const summary = store.scan(folderPath, files, { unavailable: b.unavailable === true }); try { store.classifyAll(); } catch {} try { fillMagazines(); } catch {}
         try { epubMeta(); } catch {}
         return sendJson(res, 200, { summary, library: store.snapshot() });
       }

@@ -553,15 +553,15 @@ function seriesHints(title, fileNames, base) {
 
 // ---- 월간지: 서점 도서가 아니므로 책 검색을 하지 않고, 이름에서 잡지·연월만 읽는다 ----
 const MAGAZINES = [
-  { re: /^\s*(?:생삶\s*플러스|생명의\s*삶\s*플러스)/, name: "생명의삶플러스" },
-  { re: /^\s*묵상과\s*설교/, name: "묵상과 설교" },
+  { re: /^\s*(?:생삶\s*플러스|생명의\s*삶\s*플러스)/, name: "생명의삶플러스", publisher: "두란노" },
+  { re: /^\s*묵상과\s*설교/, name: "묵상과 설교", publisher: "성서유니온선교회" },
 ];
 function magazineInfo(title, fileNames) {
   const names = [String(title || ""), ...(fileNames || []).map((n) => String(n).replace(/\.(?:pdf|epub)$/i, ""))];
   for (const t of names) {
     const m = MAGAZINES.find((x) => x.re.test(t)); if (!m) continue;
     const d = t.match(/(\d{4})\s*년\s*(\d{1,2})(?:\s*[-~]\s*(\d{1,2}))?\s*월/);
-    return { name: m.name, year: d ? d[1] : "", month: d ? d[2] + (d[3] ? "-" + d[3] : "") : "" };
+    return { name: m.name, publisher: m.publisher || "", year: d ? d[1] : "", month: d ? d[2] + (d[3] ? "-" + d[3] : "") : "" };
   }
   return null;
 }
