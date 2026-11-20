@@ -59,11 +59,8 @@ function createServer({ publicDir, dataDir, settingsDirs = [], restart = null })
         if (w.fillState && !force && !(w.fillState === 'nomatch' && (w.fillVer || 1) < 4)) return ({ status: 'skipped', work: w });
         try {
           let hit = null;
-          if (w.isbn) {
-            const found = await L.lookupIsbn(w.isbn);
-            const c = found.candidate; if (c) hit = { cand: c, score: 1 };
-            if (found.errors.length && !c) return ({ status: 'error', message: found.errors[0], work: w });
-          } else {
+          // 제목으로 찾기: ISBN이 없거나, ISBN으로 서점에서 못 찾았을 때 쓴다.
+          const byTitle = async () => {
             const fnames = store.filesOfWork(wid).map((f) => f.name);
             const hint0 = L.fileHint(fnames);
             const sh = [...L.seriesHints(w.title, fnames, hint0 || w), ...L.commentaryHints(w.title, fnames)];
@@ -71,11 +68,21 @@ function createServer({ publicDir, dataDir, settingsDirs = [], restart = null })
             const plan = hints.length ? hints.flatMap((h) => h.queries.map((q) => ({ q, h }))) : L.queryVariants(w.title).map((q) => ({ q, h: null }));
             for (const { q, h } of plan) {
               const found = await L.searchBookstores({ query: { query: q } });
-              if (found.errors.length && !found.candidates.some((c) => c.sourceStatus === 'live')) return ({ status: 'error', message: found.errors[0], work: w });
+              if (found.errors.length && !found.candidates.some((c) => c.sourceStatus === 'live')) return { error: found.errors[0] };
               const kc = found.candidates.filter((c) => c.provider === 'kakao');
-              hit = (h && (h.series ? L.pickMatchSeries(h, kc) : L.pickMatchHint(h, kc))) || L.pickMatch(w.title, kc, 0.9);
-              if (hit) break;
+              const m = (h && (h.series ? L.pickMatchSeries(h, kc) : L.pickMatchHint(h, kc))) || L.pickMatch(w.title, kc, 0.9);
+              if (m) return { hit: m };
             }
+            return {};
+          };
+          if (w.isbn) {
+            const found = await L.lookupIsbn(w.isbn);
+            const c = found.candidate; if (c) hit = { cand: c, score: 1 };
+            if (found.errors.length && !c) return ({ status: 'error', message: found.errors[0], work: w });
+            // 전자책 ISBN은 종이책과 달라 서점에 없는 경우가 많다. 그럴 땐 제목으로 한 번 더 찾는다(ISBN은 그대로 둔다).
+            if (!hit && process.env.KAKAO_REST_API_KEY) { const t = await byTitle(); if (t.error) return ({ status: 'error', message: t.error, work: w }); if (t.hit) hit = t.hit; }
+          } else {
+            const t = await byTitle(); if (t.error) return ({ status: 'error', message: t.error, work: w }); if (t.hit) hit = t.hit;
           }
           const out = store.fillEmpty(wid, hit && hit.cand);
           return ({ status: hit ? 'filled' : 'nomatch', work: out });
@@ -84,7 +91,7 @@ function createServer({ publicDir, dataDir, settingsDirs = [], restart = null })
   const job = { running: false, total: 0, done: 0, filled: 0, nomatch: 0, error: '', stop: false };
   function startJob(force) {
     if (job.running) return;
-    const todo = store.snapshot().works.filter((w) => !w.isbn && (force || !w.fillState || (w.fillState === 'nomatch' && (w.fillVer || 1) < 4))).map((w) => w.id);
+    const todo = store.snapshot().works.filter((w) => (!w.isbn || (!w.fillState && !(w.coverUrl && w.author && w.publisher))) && (force || !w.fillState || (w.fillState === 'nomatch' && (w.fillVer || 1) < 4))).map((w) => w.id);
     Object.assign(job, { running: true, total: todo.length, done: 0, filled: 0, nomatch: 0, error: '', stop: false });
     (async () => {
       for (const id of todo) {

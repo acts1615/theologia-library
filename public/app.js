@@ -462,7 +462,7 @@ async function fillByIsbn(wid, isbnArg) {
       const got = (r.filled || []).map((k) => names[k]).filter(Boolean);
       toast(`${r.candidate.providerLabel}에서 찾았습니다: ${r.candidate.title}${got.length ? ' · 채운 항목: ' + got.join(', ') : ' · 이미 채워져 있어 바꾼 항목은 없습니다'}`);
     } else {
-      toast((r.errors && r.errors[0]) || '이 ISBN의 책을 찾지 못했습니다. ISBN은 저장했습니다.', true);
+      toast((r.errors && r.errors[0]) || '서점에서 이 ISBN을 찾지 못했습니다. ISBN은 저장했습니다. 전자책 ISBN은 종이책과 달라 검색되지 않는 경우가 많으니, “서점 정보로 채우기”에서 제목으로 찾아 보세요.', true);
     }
     renderAll();
   } catch (e) { toast(e.message, true); } finally { busy(''); }
