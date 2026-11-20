@@ -6,6 +6,7 @@ const path = require('path');
 const L = require('./logic');
 const { createStore } = require('./store');
 const EPUB = require('./epub');
+const { createNotes } = require('./notes');
 const { createUpdater } = require('./updater');
 
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'application/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.ico': 'image/x-icon', '.woff': 'font/woff', '.woff2': 'font/woff2', '.ttf': 'font/ttf', '.map': 'application/json', '.mjs': 'application/javascript; charset=utf-8', '.wasm': 'application/wasm', '.bcmap': 'application/octet-stream', '.pfb': 'application/octet-stream', '.icc': 'application/octet-stream' };
@@ -26,15 +27,16 @@ function readBody(req, limit = 80 * 1024 * 1024) {
 // 서점 API 키: data/settings.json (exe 옆 settings.json 도 읽음)
 function createSettings(dataDir, extraDirs = []) {
   const file = path.join(dataDir, 'settings.json');
-  const KEYS = ['KAKAO_REST_API_KEY', 'SEARCH_INDEX_PATH', 'NL_CERT_KEY'];
+  const KEYS = ['KAKAO_REST_API_KEY', 'SEARCH_INDEX_PATH', 'NL_CERT_KEY', 'NOTES_DIR'];
   const apply = (obj) => { for (const k of KEYS) if (obj && typeof obj[k] === 'string' && obj[k].trim()) process.env[k] = obj[k].trim(); };
   for (const d of [...extraDirs, dataDir]) { try { apply(JSON.parse(fs.readFileSync(path.join(d, 'settings.json'), 'utf8'))); } catch {} }
   return {
-    status: () => ({ dataDir, build: (() => { try { return require('./build.json').build; } catch { return ''; } })(), version: versionOf((() => { try { return require('./build.json').seq; } catch { return 0; } })()), kakao: !!process.env.KAKAO_REST_API_KEY, nl: !!process.env.NL_CERT_KEY, searchIndex: process.env.SEARCH_INDEX_PATH || '' }),
+    status: () => ({ dataDir, build: (() => { try { return require('./build.json').build; } catch { return ''; } })(), version: versionOf((() => { try { return require('./build.json').seq; } catch { return 0; } })()), kakao: !!process.env.KAKAO_REST_API_KEY, nl: !!process.env.NL_CERT_KEY, searchIndex: process.env.SEARCH_INDEX_PATH || '', notesDir: process.env.NOTES_DIR || '' }),
     save(input) {
       let cur = {}; try { cur = JSON.parse(fs.readFileSync(file, 'utf8')); } catch {}
       for (const k of KEYS) if (typeof input[k] === 'string') {
         const v = input[k].trim();
+        if (v && k === 'NOTES_DIR') { try { fs.mkdirSync(v, { recursive: true }); if (!fs.statSync(v).isDirectory()) throw new Error('x'); } catch { throw new Error('노트 폴더를 만들거나 열 수 없습니다. 경로를 확인해 주세요.'); } }
         if (v) { cur[k] = v; process.env[k] = v; } else { delete cur[k]; delete process.env[k]; }
       }
       fs.writeFileSync(file, JSON.stringify(cur, null, 2));
@@ -61,6 +63,7 @@ function createServer({ publicDir, dataDir, settingsDirs = [], restart = null })
   }
   try { const n = fillMagazines(); if (n) console.log('월간지 정보 채움:', n); } catch (e) { console.error('magazine fill failed', e.message); }
   const settings = createSettings(dataDir, settingsDirs);
+  const notes = createNotes(() => process.env.NOTES_DIR);
   const cur = (() => { try { const b = require('./build.json'); return { seq: Number(b.seq) || 0, version: versionOf(b.seq) }; } catch { return { seq: 0, version: versionOf(0) }; } })();
   const updater = createUpdater({ dataDir, current: cur, restart });
   const search = require('./searchsvc.js').createSearch({ store, dataDir });
@@ -213,6 +216,25 @@ function createServer({ publicDir, dataDir, settingsDirs = [], restart = null })
           if (!x) return sendJson(res, 404, { error: '없는 자원' });
           res.writeHead(200, { 'Content-Type': x.type, 'Cache-Control': 'no-store', 'Content-Security-Policy': x.csp, 'X-Content-Type-Options': 'nosniff' }); return res.end(x.data);
         } catch (e) { return sendJson(res, 500, { error: 'EPUB을 열 수 없습니다: ' + String(e && e.message || e) }); }
+      }
+
+      // 노트 폴더(.md): 책 노트·주제 노트, [[이름]] 연결, 백링크
+      if (p.startsWith('/api/notes/')) {
+        const host = String(req.headers.host || ''); const port = server.address().port;
+        if (host !== `127.0.0.1:${port}` && host !== `localhost:${port}`) { res.writeHead(403); return res.end(); }
+        if (!notes.dir()) return sendJson(res, 400, { error: '설정에서 노트 폴더를 먼저 정해 주세요.' });
+        try {
+          if (p === '/api/notes/note' && m === 'GET') {
+            const name = String(url.searchParams.get('name') || '').trim(); if (!name) return sendJson(res, 400, { error: '이름이 필요합니다.' });
+            const wk = (n) => { const k = L.normalized(notes.safeName(n)); const w = store.snapshot().works.find((x) => L.normalized(notes.safeName(x.title)) === k); return w ? w.id : ''; };
+            return sendJson(res, 200, await notes.info(name, wk));
+          }
+          if (p === '/api/notes/note' && m === 'PUT') {
+            const b = await readBody(req, 4 * 1024 * 1024); const name = String(b.name || '').trim(); if (!name) return sendJson(res, 400, { error: '이름이 필요합니다.' });
+            return sendJson(res, 200, await notes.write(name, b.text, b.baseMtime));
+          }
+          if (p === '/api/notes/list' && m === 'GET') return sendJson(res, 200, { notes: (await notes.walk()).map((x) => x.name).sort((a, b) => a.localeCompare(b, 'ko')) });
+        } catch (e) { return sendJson(res, e && e.status || 500, { error: String((e && e.message) || e) }); }
       }
 
       // 마크다운(.md): 본문 글자를 그대로 전달(화면에서 안전하게 변환)

@@ -76,6 +76,11 @@ ipcMain.handle('theologia:select-pdf-folder', async (event) => {
   return { canceled: false, folder, files: await collectPdfs(folder) };
 });
 
+ipcMain.handle('theologia:select-folder', async (event, title) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  const r = await dialog.showOpenDialog(win, { title: typeof title === 'string' && title ? title.slice(0, 60) : '폴더 선택', properties: ['openDirectory', 'createDirectory'] });
+  return r.canceled || !r.filePaths[0] ? { canceled: true, folder: '' } : { canceled: false, folder: r.filePaths[0] };
+});
 ipcMain.handle('theologia:scan-folder', async (_event, folder) => {
   if (typeof folder !== 'string' || !folder) return { ok: false, files: [] };
   try {

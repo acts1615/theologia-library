@@ -375,6 +375,7 @@ function renderDrawer() {
     <div class="sec"><h5>성경 연결 <button class="btn sm" data-act="bible">편집</button></h5>
       <div class="tags">${w.bibleBooks.length ? w.bibleBooks.map((b) => `<span class="tag">${esc(b)}</span>`).join('') : '<span style="color:var(--faint)">연결된 성경 책이 없습니다</span>'}</div></div>
     <div class="sec"><h5>태그</h5><div class="tags" id="tags">${tagsHtml(w)}</div></div>
+    <div class="sec"><h5>노트 ${S.settings && S.settings.notesDir ? '<button class="btn sm" data-act="note-open" data-v="' + esc(w.id) + '">책 노트 열기</button>' : ''}</h5>${S.settings && S.settings.notesDir ? '<p class="help">이 책의 노트를 노트 폴더에 md 파일로 씁니다. <code>[[주제]]</code>로 다른 노트와 이어집니다.</p>' : '<p class="help">설정에서 노트 폴더를 정하면 책마다 노트를 쓰고 <code>[[ ]]</code>로 이을 수 있습니다.</p>'}</div>
     <div class="sec"><h5>메모</h5><textarea data-f="note" placeholder="읽은 소감, 인용할 쪽, 참고할 점…">${esc(w.note)}</textarea></div>
     <div class="sec"><h5>위치</h5>${(locInfo(w) ? locInfo(w).list : []).map((g) => `
       <div class="locrow"><button class="loc ${g.file.missing ? 'warn' : ''}" data-act="show-pdf" data-v="${g.file.id}" title="눌러서 위치 보기">📁 <span>${esc(g.label)}</span></button>
@@ -427,7 +428,7 @@ function modal(title, bodyHtml, buttons, onMount) {
   });
   document.body.appendChild(m); if (onMount) onMount(m); return m;
 }
-const closeModal = () => { const m = $('#modal'); if (m) m.remove(); };
+const closeModal = () => { if (typeof NT !== 'undefined' && NT) { const n = NT; if (n.dirty) ntSave(true); clearTimeout(n.timer); NT = null; } const m = $('#modal'); if (m) m.remove(); };
 
 function bibleModal(w) {
   const grp = (t) => S.ref.bibleBooks.filter((b) => b.testament === t).map((b) => `<label><input type="checkbox" value="${esc(b.name)}" ${w.bibleBooks.includes(b.name) ? 'checked' : ''}/>${esc(b.name)}</label>`).join('');
@@ -520,6 +521,9 @@ async function settingsModal() {
     <div class="field" style="grid-template-columns:110px 1fr;margin-top:14px"><label>본문 검색 색인</label><input id="k-index" type="text" value="${esc(S.settings.searchIndex || '')}" placeholder="비워 두면 PDF 폴더 옆 _서재색인을 자동으로 찾습니다"></div>
     <p class="help" style="margin:2px 0 0 120px">${sxLine}<br>다른 곳에 둔 색인을 쓰려면 서재색인.db 파일 또는 그것이 든 폴더의 경로를 적으세요. 색인은 읽기만 하며 바꾸지 않습니다. 책 짝은 폴더 기준 경로로 찾고, 안 맞으면 파일 이름과 크기로 찾습니다.</p>
 ${fillStatsHtml()}
+    <h5 style="margin:18px 0 6px">노트 폴더</h5>
+    <div class="field" style="grid-template-columns:110px 1fr auto"><label>노트 폴더</label><input id="k-notes" type="text" value="${esc(S.settings.notesDir || '')}" placeholder="비워 두면 노트 기능은 꺼집니다">${window.theologiaDesktop && window.theologiaDesktop.selectFolder ? '<button class="btn sm" id="k-notes-pick" type="button">고르기…</button>' : ''}</div>
+    <p class="help" style="margin:2px 0 0 120px">책 노트와 주제 노트를 일반 md 파일로 저장하는 폴더입니다. 옵시디언에서 이 폴더를 열면 그대로 보입니다. 구글 드라이브를 쓰려면 ‘내 파일 미러링’ 폴더 안에 만드세요. 폴더를 바꾸면 기존 노트는 옮겨지지 않으니 파일을 직접 옮겨 주세요.</p>
     <h5 style="margin:18px 0 6px">백업과 되돌리기</h5>
     <p class="help">분류·메모·읽은 위치 같은 서재 기록을 파일 하나로 저장합니다. 책 파일(PDF·EPUB)은 들어 있지 않고, API 키도 담기지 않습니다. 다른 컴퓨터로 옮길 때도 이 파일을 쓰면 됩니다.</p>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><a class="btn sm" id="bk-export" href="/api/backup/export" download>백업 파일 만들기</a><button class="btn sm" id="bk-import" type="button">백업에서 되돌리기…</button><input type="file" id="bk-file" accept=".json,application/json" hidden></div>
@@ -531,10 +535,54 @@ ${fillStatsHtml()}
       const nlk = m.querySelector('#k-nl').value; if (nlk) body.NL_CERT_KEY = nlk;
       const ix = m.querySelector('#k-index').value.trim(); const indexChanged = ix !== (S.settings.searchIndex || '');
       if (indexChanged) body.SEARCH_INDEX_PATH = ix;
+      const nd = m.querySelector('#k-notes').value.trim(); if (nd !== (S.settings.notesDir || '')) body.NOTES_DIR = nd;
       if (!Object.keys(body).length) return false;
       try { S.settings = await api('/api/settings', 'PUT', body); toast('저장했습니다.'); if (indexChanged) { try { await api('/api/search/reload', 'POST', {}); } catch {} loadSearchStatus(); } if (body.KAKAO_REST_API_KEY) setTimeout(() => autoFillAll(), 300); } catch (e) { toast(e.message, true); return true; }
     } }]);
 }
+
+// ---------- 노트 (노트 폴더의 md 파일) ----------
+var NT = null;
+async function ntSave(force) {
+  if (!NT || !NT.dirty) return true; clearTimeout(NT.timer); const n = NT;
+  try { const r = await api('/api/notes/note', 'PUT', { name: n.name, text: n.text, baseMtime: n.exists ? n.mtime : null }); n.mtime = r.mtimeMs; n.exists = true; n.dirty = false; const s = $('#nt-save'); if (s && NT === n) s.textContent = '저장됨'; ntRefreshSide(); return true; }
+  catch (e) { const s = $('#nt-save'); if (s) { s.textContent = '저장 안 됨: ' + e.message; s.style.color = '#b3402a'; } if (force) toast(e.message, true); return false; }
+}
+function ntSideHtml(info) {
+  const lst = (arr, f) => arr.length ? arr.map(f).join('') : '<span class="help">없습니다</span>';
+  return `<h5>이 노트에서 이어진 곳</h5><div class="nt-chips">${lst(info.links || [], (l) => `<button class="chip-s ${l.exists || l.work ? '' : 'new'}" data-nt="${esc(l.name)}">${esc(l.name)}${l.work ? ' 📖' : l.exists ? '' : ' ＋'}</button>`)}</div>
+    <h5>이 노트를 언급한 노트 (백링크)</h5><div class="nt-back">${lst(info.backlinks || [], (b) => `<button class="bl" data-nt="${esc(b.name)}"><b>${esc(b.name)}</b><small>${esc(b.snippet)}</small></button>`)}</div>`;
+}
+async function ntRefreshSide() { const n = NT; if (!n) return; try { const info = await api('/api/notes/note?name=' + encodeURIComponent(n.name)); const s = $('#modal .nt-side'); if (NT === n && s) s.innerHTML = ntSideHtml(info); } catch {} }
+function ntRender(info) {
+  const n = NT; const wk = (info.links || []);
+  const m = $('#modal'); if (!m) return;
+  const lst = (arr, f) => arr.length ? arr.map(f).join('') : '<span class="help">없습니다</span>';
+  $('.mb', m).innerHTML = `<div class="nt-top"><button class="btn sm" id="nt-mode">${n.mode === 'edit' ? '미리보기' : '쓰기'}</button>${n.workId ? '<button class="btn sm" id="nt-lib">서재에서 책 보기</button>' : ''}<span id="nt-save" class="help"></span></div>
+    ${n.mode === 'edit' ? `<textarea id="nt-text" class="nt-text" spellcheck="false" placeholder="읽은 내용, 인용, 내 생각… [[주제]]로 다른 노트와 이을 수 있습니다.">${esc(n.text)}</textarea>` : `<article class="md-art nt-prev" id="nt-prev"></article>`}
+    <div class="nt-side">${ntSideHtml(info)}</div>`;
+  if (n.mode !== 'edit') $('#nt-prev').innerHTML = window.TLMd.render(n.text || '_아직 비어 있습니다._', true);
+  const ta = $('#nt-text', m); if (ta) ta.addEventListener('input', () => { n.text = ta.value; n.dirty = true; clearTimeout(n.timer); const s = $('#nt-save'); if (s) { s.textContent = '쓰는 중…'; s.style.color = ''; } n.timer = setTimeout(() => ntSave(false), 1500); });
+}
+async function openNote(name, workId) {
+  if (NT && NT.dirty && !(await ntSave(true))) return;
+  name = String(name || '').trim(); if (!name) return;
+  let info; try { info = await api('/api/notes/note?name=' + encodeURIComponent(name)); } catch (e) { toast(e.message, true); return; }
+  const w = workId ? work(workId) : S.lib.works.find((x) => x.title.replace(/[\\/:*?"<>|]/g, '').trim().toLowerCase() === name.replace(/[\\/:*?"<>|]/g, '').trim().toLowerCase());
+  const tpl = w ? `# ${w.title}\n\n- 저자: ${w.author || ''}\n- 출판: ${[w.publisher, w.year].filter(Boolean).join(' ')}\n\n## 핵심\n\n\n## 인용 (쪽수)\n\n\n## 내 생각\n\n` : `# ${name}\n\n`;
+  const first = !info.exists;
+  const mm = modal(name, '', [{ label: '닫기' }], null);
+  NT = { name, workId: w ? w.id : '', text: first ? tpl : info.text, mtime: info.mtimeMs, exists: !first, dirty: false, mode: first ? 'edit' : 'view', timer: 0 };
+  mm.querySelector('.modal').classList.add('note-modal'); ntRender(info);
+}
+document.addEventListener('click', async (e) => {
+  if (e.target.closest('#k-notes-pick')) { const r = await window.theologiaDesktop.selectFolder('노트 폴더 선택'); if (r && !r.canceled) $('#k-notes').value = r.folder; return; }
+  if (!NT) return; const t = e.target.closest('[data-nt], #nt-mode, #nt-lib, a.wl'); if (!t) return;
+  e.preventDefault();
+  if (t.id === 'nt-mode') { const ta = $('#nt-text'); if (ta) NT.text = ta.value; NT.mode = NT.mode === 'edit' ? 'view' : 'edit'; await ntSave(true); const info = await api('/api/notes/note?name=' + encodeURIComponent(NT.name)).catch(() => ({ links: [], backlinks: [] })); ntRender(info); return; }
+  if (t.id === 'nt-lib') { const id = NT.workId; await ntSave(true); NT = null; closeModal(); S.open = id; renderAll(); return; }
+  const nm = t.dataset.nt || t.dataset.note; if (nm) openNote(nm).then(() => { const m = $('#modal h2'); if (m && NT) m.textContent = NT.name; });
+}, true);
 
 // ---------- 폴더 동작 ----------
 function busy(msg) {
@@ -666,6 +714,7 @@ document.addEventListener('click', async (e) => {
     case 'status': { const w = work(S.open); queueSave(w.id, { status: v }); renderDrawer(); renderList(); break; }
     case 'ok-review': queueSave(S.open, { review: false }); renderAll(); break;
     case 'bible': bibleModal(work(S.open)); break;
+    case 'note-open': openNote(work(v) ? work(v).title : '', v); break;
     case 'bookstore': bookstoreModal(work(S.open)); break;
     case 'fill-isbn': fillByIsbn(S.open); break;
     case 'find-isbn': findIsbnInPdf(S.open); break;

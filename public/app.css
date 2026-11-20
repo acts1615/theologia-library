@@ -327,3 +327,15 @@ body.side-off .upd{display:none}
 .md-art code{background:#8882;padding:.1em .35em;border-radius:4px;font-size:.9em}.md-art pre code{background:none;padding:0}
 .md-art table{border-collapse:collapse;margin:1em 0}.md-art th,.md-art td{border:1px solid #8886;padding:6px 10px}.md-art th{background:#8882}
 .md-art a{color:#2a6fb0}
+
+/* 노트 */
+.modal.note-modal{width:min(820px,94vw);height:84vh}
+.note-modal .mb{display:flex;flex-direction:column;gap:10px;flex:1;min-height:0}
+.nt-top{display:flex;gap:8px;align-items:center}.nt-top .help{margin:0 0 0 auto}
+.nt-text{flex:1;min-height:260px;width:100%;resize:none;font:15px/1.7 "Noto Sans KR",sans-serif;padding:12px;border:1px solid var(--line);border-radius:8px;background:#fffefa;color:inherit}
+.nt-prev{flex:1;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:6px 16px 16px;background:#fbf9f4;max-width:none;font-size:16px}
+.nt-prev a.wl{color:#2a6fb0;text-decoration:underline dotted;cursor:pointer}
+.nt-side{max-height:30%;overflow:auto}.nt-side h5{margin:8px 0 4px}
+.nt-chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip-s{border:1px solid var(--line);background:#fff;border-radius:14px;padding:2px 10px;cursor:pointer;font-size:13px}.chip-s.new{border-style:dashed;color:#8a8e84}
+.nt-back{display:flex;flex-direction:column;gap:4px}.bl{text-align:left;border:1px solid var(--line);background:#fff;border-radius:8px;padding:6px 10px;cursor:pointer}.bl small{display:block;color:#8a8e84;margin-top:2px}
