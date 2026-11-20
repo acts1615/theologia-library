@@ -83,7 +83,8 @@ function chapterLabel() {
 function styleDoc(doc) {
   let st = doc.getElementById('tl-style'); if (!st) { st = doc.createElement('style'); st.id = 'tl-style'; (doc.head || doc.documentElement).appendChild(st); }
   const [bg, fg] = THEMES[E.theme] || THEMES.light; const dark = E.theme === 'dark';
-  st.textContent = `html{zoom:${E.zoom};background:${bg} !important}
+  st.textContent = `::selection{background:#95BDD7 !important;color:#1b1b1b !important}
+html{zoom:${E.zoom};background:${bg} !important}
 body{background:${bg} !important;color:${fg} !important;max-width:46em;margin:0 auto !important;padding:28px 36px 90px !important;line-height:1.75;font-family:'Noto Serif KR','Nanum Myeongjo',AppleMyungjo,Georgia,serif;word-break:keep-all;overflow-wrap:anywhere;box-sizing:border-box}
 ${dark ? `body *{color:${fg} !important;background-color:transparent !important;border-color:#555 !important}a{color:#9cc4ff !important}` : (E.theme === 'sepia' ? `body *{color:${fg} !important;background-color:transparent !important}` : '')}
 img,svg,video{max-width:100% !important;height:auto}
