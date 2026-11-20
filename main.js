@@ -110,6 +110,24 @@ function listen(srv, port) {
   });
 }
 
+
+// 서점 검색 페이지를 앱 안 창으로 연다. 사이트가 글자 복사를 막아도 ISBN을 복사할 수 있다.
+let storeWin = null;
+function openStoreWindow(url) {
+  try {
+    if (storeWin && !storeWin.isDestroyed()) { storeWin.loadURL(url); storeWin.focus(); return; }
+    storeWin = new BrowserWindow({
+      width: 1100, height: 860, autoHideMenuBar: true, title: '서점 검색 — 글자를 드래그해 복사할 수 있습니다',
+      webPreferences: { preload: path.join(__dirname, 'storepreload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true, partition: 'persist:tl-store' },
+    });
+    const wc = storeWin.webContents;
+    wc.setWindowOpenHandler(({ url: u }) => { if (/^https?:/i.test(u)) storeWin.loadURL(u); return { action: 'deny' }; });
+    wc.on('will-navigate', (e, u) => { if (!/^https?:/i.test(u)) e.preventDefault(); });
+    storeWin.on('closed', () => { storeWin = null; });
+    storeWin.loadURL(url);
+  } catch (e) { shell.openExternal(url); }
+}
+
 async function start() {
   L('main: whenReady');
   server = createServer({ publicDir: path.join(__dirname, 'public'), dataDir: DATA_DIR, settingsDirs: [EXE_DIR], restart: () => { try { server && server.close(); } catch {} app.relaunch(); app.exit(0); } });
@@ -123,7 +141,11 @@ async function start() {
     title: 'Theologia Library', backgroundColor: '#f6f6f1', autoHideMenuBar: true,
     webPreferences: { preload: path.join(__dirname, 'preload.js'), contextIsolation: true, nodeIntegration: false, sandbox: true },
   });
-  mainWindow.webContents.setWindowOpenHandler(({ url }) => { if (/^https?:/i.test(url)) shell.openExternal(url); return { action: 'deny' }; });
+  mainWindow.webContents.setWindowOpenHandler(({ url, frameName }) => {
+    if (!/^https?:/i.test(url)) return { action: 'deny' };
+    if (frameName === 'tlstore') { openStoreWindow(url); return { action: 'deny' }; }   // 서점 검색 페이지: 복사 금지를 풀어 주는 앱 안 창
+    shell.openExternal(url); return { action: 'deny' };
+  });
   mainWindow.webContents.on('will-navigate', (e, url) => { if (!url.startsWith(`http://127.0.0.1:${port}`)) { e.preventDefault(); if (/^https?:/i.test(url)) shell.openExternal(url); } });
   mainWindow.on('closed', () => { mainWindow = null; });
   await mainWindow.loadURL(`http://127.0.0.1:${port}/`);
