@@ -395,3 +395,9 @@ body.pane .toasts{z-index:300}
 #split .sp-it b{display:block;font:600 13.5px/1.35 var(--serif)}
 #split .sp-it small{color:var(--muted)}
 #split .sp-empty{color:var(--muted);font-size:13px;padding:6px 2px}
+
+.ix-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:8px 0}
+.ix-row>b{width:110px;font-weight:500;font-size:13px;color:var(--muted)}
+.ix-row select,.ix-row input[type=number]{width:auto;max-width:100%}
+.ix-row input[type=checkbox]{width:auto;margin:0}
+.ix-chk{display:flex;gap:6px;align-items:center;font-size:13px}

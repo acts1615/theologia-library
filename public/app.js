@@ -542,13 +542,16 @@ async function settingsModal() {
   let sx = null; try { sx = await api('/api/search/status'); } catch {}
   const sxLine = !sx ? '' : sx.available
     ? `연결됨 · 색인 ${num(sx.books)}권 중 이 서재의 파일 ${num(sx.mapped)}개와 짝이 맞음${sx.byName ? ` (그중 ${num(sx.byName)}개는 이름·크기로 맞춤)` : ''}<br><small>${esc(sx.dbPath || '')}</small>`
-    : esc(sx.error || '연결되지 않음');
+    : esc(sx.error === 'index-not-found' ? '아직 연결된 색인이 없습니다. 아래에서 만들거나 위치를 지정해 주세요.' : (sx.error || '연결되지 않음'));
   modal('설정', `<p class="help">카카오(다음) 책 검색 REST API 키입니다. 키가 있으면 제목·저자·출판사·표지를 자동으로 채웁니다. 이 컴퓨터의 앱 폴더(data/settings.json)에만 저장됩니다. 비워 두고 저장하면 키가 지워집니다.</p>
     <div class="field" style="grid-template-columns:110px 1fr"><label>카카오 REST 키</label><input id="k-kakao" type="password" placeholder="${S.settings.kakao ? '설정됨 (바꾸려면 새로 입력)' : '입력하지 않음'}" autocomplete="off"></div>
     <div class="field" style="grid-template-columns:110px 1fr;margin-top:10px"><label>국립중앙도서관 키</label><input id="k-nl" type="password" placeholder="${S.settings.nl ? '설정됨 (바꾸려면 새로 입력)' : '입력하지 않음 (선택)'}" autocomplete="off"></div>
     <p class="help" style="margin:2px 0 0 120px">ISBN으로 찾을 때 카카오에 없는 책을 국립중앙도서관 ISBN 서지정보로 한 번 더 찾습니다. 키는 nl.go.kr 로그인 후 Open API 인증키 신청에서 받습니다.</p>
     <div class="field" style="grid-template-columns:110px 1fr;margin-top:14px"><label>본문 검색 색인</label><input id="k-index" type="text" value="${esc(S.settings.searchIndex || '')}" placeholder="비워 두면 PDF 폴더 옆 _서재색인을 자동으로 찾습니다"></div>
     <p class="help" style="margin:2px 0 0 120px">${sxLine}<br>다른 곳에 둔 색인을 쓰려면 서재색인.db 파일 또는 그것이 든 폴더의 경로를 적으세요. 색인은 읽기만 하며 바꾸지 않습니다. 책 짝은 폴더 기준 경로로 찾고, 안 맞으면 파일 이름과 크기로 찾습니다.</p>
+<h5 style="margin:18px 0 6px">본문 색인 만들기</h5>
+    <p class="help">PDF에 글자가 들어 있는 책을 앱이 직접 읽어 본문 검색 색인에 보탭니다. 앱이 켜져 있는 동안 한 번에 한 쪽씩만 읽고, 읽은 시간만큼 쉬어서 컴퓨터에 부담을 적게 줍니다. 글자가 없는 스캔본은 읽지 못해 ‘없음’으로 기록됩니다. 한국어OCR 앱이 만든 색인이 있으면 그 색인에 이어서 보탭니다.</p>
+    <div id="ix-box"></div>
 ${fillStatsHtml()}
     <h5 style="margin:18px 0 6px">노트 폴더</h5>
     <div class="field" style="grid-template-columns:110px 1fr auto"><label>노트 폴더</label><input id="k-notes" type="text" value="${esc(S.settings.notesDir || '')}" placeholder="비워 두면 노트 기능은 꺼집니다">${window.theologiaDesktop && window.theologiaDesktop.selectFolder ? '<button class="btn sm" id="k-notes-pick" type="button">고르기…</button>' : ''}</div>
@@ -567,7 +570,73 @@ ${fillStatsHtml()}
       const nd = m.querySelector('#k-notes').value.trim(); if (nd !== (S.settings.notesDir || '')) body.NOTES_DIR = nd;
       if (!Object.keys(body).length) return false;
       try { S.settings = await api('/api/settings', 'PUT', body); toast('저장했습니다.'); if (indexChanged) { try { await api('/api/search/reload', 'POST', {}); } catch {} loadSearchStatus(); } if (body.KAKAO_REST_API_KEY) setTimeout(() => autoFillAll(), 300); } catch (e) { toast(e.message, true); return true; }
-    } }]);
+    } }], (m) => ixMount(m));
+}
+
+// ---------- 본문 색인 만들기 (설정 화면) ----------
+let ixTimer = 0;
+function ixMount(m) {
+  const box = m.querySelector('#ix-box'); if (!box) return;
+  const cats = [...new Set([...S.ref.categories.map((c) => c.name), ...S.lib.works.flatMap((x) => catsOf(x))])].filter(Boolean).sort((a, b) => a.localeCompare(b, 'ko'));
+  let last = null, pend = null;
+  const MODES = [['new', '최근 추가한 책'], ['folder', '폴더 하나'], ['category', '분류 하나'], ['all', '색인 안 된 책 전부']];
+  async function refreshCount() {
+    const out = box.querySelector('#ix-cnt'); if (!out) return;
+    const mode = box.querySelector('#ix-mode').value; const body = { mode, days: Number(box.querySelector('#ix-days').value) || 30, folderPath: box.querySelector('#ix-folder').value, category: box.querySelector('#ix-cat').value };
+    try { const r = await api('/api/index/count', 'POST', body); out.textContent = `색인할 책 ${num(r.count)}권`; } catch { out.textContent = ''; }
+  }
+  function paint(s) {
+    last = s; const run = s.state !== 'idle'; const j = s.job || {};
+    const pct = s.total ? Math.round((s.done / s.total) * 100) : 0;
+    if (!box.querySelector('#ix-mode')) {
+      box.innerHTML = `<div class="ix-row"><b>색인할 범위</b>
+        <select id="ix-mode">${MODES.map(([v, l]) => `<option value="${v}" ${j.mode === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
+        <span id="ix-w-new"><input id="ix-days" type="number" min="1" max="3650" value="${Number(j.days) || 30}" style="width:64px"> 일 이내</span>
+        <select id="ix-folder" style="max-width:260px">${(s.folders || []).map((f) => `<option value="${esc(f)}" ${j.folderPath === f ? 'selected' : ''}>${esc(f)}</option>`).join('')}</select>
+        <select id="ix-cat">${cats.map((c) => `<option ${j.category === c ? 'selected' : ''}>${esc(c)}</option>`).join('')}</select><span id="ix-cnt" class="help" style="margin:0"></span></div>
+      <div class="ix-row"><b>작업 강도</b><select id="ix-level">${[['light', '가볍게 (컴퓨터에 부담 적음)'], ['normal', '보통'], ['fast', '빠르게']].map(([v, l]) => `<option value="${v}" ${j.level === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
+        <label class="ix-chk"><input id="ix-auto" type="checkbox" ${j.auto ? 'checked' : ''}> 앱을 켤 때 이어서 자동으로 색인</label></div>
+      <div class="ix-row"><b></b><button class="btn sm primary" id="ix-go" type="button">색인 시작</button><button class="btn sm" id="ix-pause" type="button">일시정지</button><button class="btn sm" id="ix-stop" type="button">중지</button></div>
+      <div id="ix-prog" class="help" style="margin:4px 0 0 118px"></div>`;
+      refreshCount();
+    }
+    const vis = (id, on) => { const e = box.querySelector(id); if (e) e.style.display = on ? '' : 'none'; };
+    const md = box.querySelector('#ix-mode').value;
+    vis('#ix-w-new', md === 'new'); vis('#ix-folder', md === 'folder'); vis('#ix-cat', md === 'category');
+    box.querySelector('#ix-go').disabled = run; box.querySelector('#ix-pause').disabled = !run;
+    box.querySelector('#ix-pause').textContent = s.state === 'paused' ? '다시 시작' : '일시정지';
+    box.querySelector('#ix-stop').disabled = !run;
+    for (const id of ['#ix-mode', '#ix-days', '#ix-folder', '#ix-cat']) box.querySelector(id).disabled = run;
+    const by = Object.entries(s.byStatus || {}).map(([k, v]) => `${k} ${num(v)}`).join(' · ');
+    let t = '';
+    if (run) t = `${s.state === 'paused' ? '일시정지됨' : '색인 중'} · ${num(s.done)} / ${num(s.total)}권 (${pct}%)${s.current ? `<br><small>${esc(s.current)}</small>` : ''}`;
+    else if (s.total && s.startedAt) t = `끝났습니다 · 새로 ${num(s.added)}권${s.have ? ` · 이미 있음 ${num(s.have)}권` : ''}${s.skipped ? ` · 건너뜀 ${num(s.skipped)}권` : ''}${s.failed ? ` · 실패 ${num(s.failed)}권` : ''}${by ? `<br><small>${esc(by)}</small>` : ''}`;
+    if (s.error) t += `<br><span style="color:#b3402a">${esc(s.error)}</span>`;
+    if ((s.skippedList || []).length) t += `<br><small>건너뛴 책: ${s.skippedList.slice(0, 5).map((x) => esc(x.name + ' — ' + x.why)).join(' / ')}${s.skippedList.length > 5 ? ' …' : ''}</small>`;
+    t += `<br><small>색인 파일: ${esc(s.dbPath || '')}${s.dbExists ? '' : ' (처음 시작할 때 만들어집니다)'}</small>`;
+    box.querySelector('#ix-prog').innerHTML = t;
+  }
+  async function poll() { if (!document.body.contains(box)) { clearTimeout(ixTimer); return; } try { paint(await api('/api/index/status')); } catch {} ixTimer = setTimeout(poll, last && last.state !== 'idle' ? 1500 : 5000); }
+  box.addEventListener('change', async (e) => {
+    const id = e.target.id;
+    if (id === 'ix-level' || id === 'ix-auto') { try { paint(await api('/api/index/options', 'POST', id === 'ix-level' ? { level: e.target.value } : { auto: e.target.checked })); } catch (er) { toast(er.message, true); } }
+    else { if (last) paint(last); refreshCount(); }
+  });
+  box.addEventListener('input', (e) => { if (e.target.id === 'ix-days') refreshCount(); });
+  box.addEventListener('click', async (e) => {
+    const id = e.target.id;
+    try {
+      if (id === 'ix-go') {
+        const body = { mode: box.querySelector('#ix-mode').value, days: Number(box.querySelector('#ix-days').value) || 30, folderPath: box.querySelector('#ix-folder').value, category: box.querySelector('#ix-cat').value, level: box.querySelector('#ix-level').value, auto: box.querySelector('#ix-auto').checked };
+        if (body.mode === 'folder' && !body.folderPath) { toast('폴더를 골라 주세요.', true); return; }
+        if (body.mode === 'category' && !body.category) { toast('분류를 골라 주세요.', true); return; }
+        await api('/api/index/options', 'POST', { auto: body.auto });
+        const s = await api('/api/index/start', 'POST', body); paint(s); if (s.state === 'idle') toast('색인할 책이 없습니다.');
+      } else if (id === 'ix-pause') paint(await api('/api/index/' + (last && last.state === 'paused' ? 'resume' : 'pause'), 'POST', {}));
+      else if (id === 'ix-stop') paint(await api('/api/index/stop', 'POST', {}));
+    } catch (er) { toast(er.message, true); }
+  });
+  clearTimeout(ixTimer); poll();
 }
 
 // ---------- 노트 (노트 폴더의 md 파일) ----------

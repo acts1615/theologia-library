@@ -67,6 +67,8 @@ function createServer({ publicDir, dataDir, settingsDirs = [], restart = null })
   const cur = (() => { try { const b = require('./build.json'); return { seq: Number(b.seq) || 0, version: versionOf(b.seq) }; } catch { return { seq: 0, version: versionOf(0) }; } })();
   const updater = createUpdater({ dataDir, current: cur, restart });
   const search = require('./searchsvc.js').createSearch({ store, dataDir });
+  const indexer = require('./indexsvc.js').createIndexer({ store, search, dataDir, publicDir });
+  indexer.kick(45000);
   const indexHtml = path.join(publicDir, 'index.html');
   async function autofillOne(wid, force) {
     const w = store.workById(wid); if (!w) return { status: 'missing' };
@@ -152,6 +154,7 @@ function createServer({ publicDir, dataDir, settingsDirs = [], restart = null })
         if (!folderPath) return sendJson(res, 400, { error: 'folderPath가 필요합니다.' });
         const summary = store.scan(folderPath, files, { unavailable: b.unavailable === true }); try { store.classifyAll(); } catch {} try { fillMagazines(); } catch {}
         try { epubMeta(); } catch {}
+        try { indexer.kick(60000); } catch {}
         return sendJson(res, 200, { summary, library: store.snapshot() });
       }
       if (p === '/api/library/folders' && m === 'DELETE') {
@@ -326,6 +329,13 @@ function createServer({ publicDir, dataDir, settingsDirs = [], restart = null })
         return out ? sendJson(res, 200, store.snapshot()) : sendJson(res, 404, { error: '파일 또는 작품을 찾을 수 없습니다.' });
       }
 
+      if (p === '/api/index/status' && m === 'GET') return sendJson(res, 200, indexer.status());
+      if (p === '/api/index/count' && m === 'POST') { const b = await readBody(req); return sendJson(res, 200, { count: await indexer.count(b) }); }
+      if (p === '/api/index/start' && m === 'POST') { const b = await readBody(req); try { return sendJson(res, 200, await indexer.start(b)); } catch (e) { return sendJson(res, 400, { error: e.message }); } }
+      if (p === '/api/index/pause' && m === 'POST') return sendJson(res, 200, indexer.pause());
+      if (p === '/api/index/resume' && m === 'POST') return sendJson(res, 200, indexer.resume());
+      if (p === '/api/index/stop' && m === 'POST') return sendJson(res, 200, indexer.stop());
+      if (p === '/api/index/options' && m === 'POST') { const b = await readBody(req); if (b.level) indexer.setLevel(b.level); if (typeof b.auto === 'boolean') indexer.setAuto(b.auto); return sendJson(res, 200, indexer.status()); }
       if (p === '/api/search/status' && m === 'GET') { try { return sendJson(res, 200, await search.status()); } catch (e) { return sendJson(res, 200, { available: false, error: e.message }); } }
       if (p === '/api/search/pnum' && m === 'GET') { try { return sendJson(res, 200, { pnum: await search.pnum(url.searchParams.get('fileId') || '') }); } catch { return sendJson(res, 200, { pnum: [] }); } }
       if (p === '/api/search/reload' && m === 'POST') { try { await search.reload(); return sendJson(res, 200, await search.status()); } catch (e) { return sendJson(res, 200, { available: false, error: e.message }); } }
@@ -377,7 +387,7 @@ function createServer({ publicDir, dataDir, settingsDirs = [], restart = null })
       if (!res.headersSent) sendJson(res, 500, { error: '서버 오류가 발생했습니다.' }); else res.end();
     }
   });
-  server.on('close', () => { store.flush(); search.close(); });
+  server.on('close', () => { store.flush(); indexer.close(); search.close(); });
   server.flushStore = () => store.flush();
   return server;
 }

@@ -76,14 +76,18 @@ function createSearch({ store, dataDir }) {
         const up = path.dirname(dir); if (up === dir) break; dir = up;
       }
     }
+    // 이 앱이 직접 만든 색인 (데이터 폴더 안). 책 경로는 'abs:' 로 시작하는 전체 경로로 적힌다.
+    const own = path.join(dataDir, '색인', DBNAME);
+    try { if (fs.statSync(own).isFile()) return { root: '', dbPath: own, own: true }; } catch {}
     return null;
   }
   const mtimeOf = (p) => { let m = 0; for (const s of ['', '-wal']) { try { m = Math.max(m, fs.statSync(p + s).mtimeMs); } catch {} } return m; };
-  const relOf = (file) => { const r = path.relative(st.root, file.path); return r.startsWith('..') || path.isAbsolute(r) ? null : nk(r); };
+  const relOf = (file) => { if (!st.root) return null; const r = path.relative(st.root, file.path); return r.startsWith('..') || path.isAbsolute(r) ? null : nk(r); };
 
+  const absKey = (f) => 'abs:' + nk(f.path);
   function remap() {
     st.fileOfBook = new Map(); let mapped = 0, byName = 0; const files = store.snapshot().files;
-    const byRel = new Map(); for (const f of files) { const r = relOf(f); if (r) byRel.set(r, f); }
+    const byRel = new Map(); for (const f of files) { const r = relOf(f); if (r) byRel.set(r, f); byRel.set(absKey(f), f); }
     const left = [];
     for (const [bid, b] of st.books) { const f = byRel.get(nk(b.rel)); if (f) { st.fileOfBook.set(bid, f.id); mapped++; } else left.push([bid, b]); }
     // 경로가 달라진 책(폴더 이름·위치가 다른 컴퓨터/외장하드): 파일 이름 + 크기가 같으면 같은 책으로 본다. 후보가 하나일 때만.
@@ -141,7 +145,7 @@ function createSearch({ store, dataDir }) {
     q = String(q || '').trim();
     if (!q) return { error: '검색어를 입력해 주세요.' };
     await load();
-    if (!st.available) return { error: st.error === 'index-not-found' ? (String(process.env.SEARCH_INDEX_PATH || '').trim() ? '설정에서 지정한 색인 위치에서 색인 파일(서재색인.db)을 찾지 못했습니다. 경로를 확인해 주세요.' : '서재 색인을 찾지 못했습니다. PDF 폴더 옆에 _서재색인 폴더가 있어야 합니다. 다른 곳에 있으면 설정에서 위치를 지정할 수 있습니다.') : st.error, unavailable: true };
+    if (!st.available) return { error: st.error === 'index-not-found' ? (String(process.env.SEARCH_INDEX_PATH || '').trim() ? '설정에서 지정한 색인 위치에서 색인 파일(서재색인.db)을 찾지 못했습니다. 경로를 확인해 주세요.' : '서재 색인을 찾지 못했습니다. PDF 폴더 옆에 _서재색인 폴더가 있거나, 설정의 ‘본문 색인 만들기’로 색인을 만들어야 합니다. 다른 곳에 있으면 설정에서 위치를 지정할 수 있습니다.') : st.error, unavailable: true };
     const files = store.snapshot().files, fileById = new Map(files.map((f) => [f.id, f]));
     const bookOfFile = new Map(); for (const [bid, fid] of st.fileOfBook) bookOfFile.set(fid, bid);
     let bookIds;
@@ -200,7 +204,19 @@ function createSearch({ store, dataDir }) {
   }
   function close() { try { worker && worker.terminate(); } catch {} worker = null; }
 
-  return { status, search, bestPath, pnum, reload: () => load(true), close, parseWords };
+  // 색인을 만드는 쪽이 쓰는 정보: 색인 파일 위치(없으면 데이터 폴더 안에 새로 만들 위치)와, 파일마다 색인에 적을 책 경로
+  function target() {
+    const f = detect();
+    if (f) return { dbPath: f.dbPath, root: f.root || '', exists: true };
+    return { dbPath: path.join(dataDir, '색인', DBNAME), root: '', exists: false };
+  }
+  function relFor(file, root) {
+    if (root) { const r = path.relative(root, file.path); if (!r.startsWith('..') && !path.isAbsolute(r)) return r.replace(/\\/g, '/'); }
+    return 'abs:' + String(file.path).replace(/\\/g, '/');
+  }
+  async function indexedFileIds() { try { await load(); } catch {} return new Set(st.available ? st.fileOfBook.values() : []); }
+
+  return { status, search, bestPath, pnum, reload: () => load(true), close, parseWords, target, relFor, indexedFileIds };
 }
 
 module.exports = { createSearch, parseWords };

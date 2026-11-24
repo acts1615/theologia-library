@@ -52,7 +52,7 @@ function helpHtml() {
   if (s && s.available) {
     const ok = (s.by['글자층'] || {}).books || 0;
     info = `<p class="tsr-info">본문 색인 <b>${num(s.mapped)}</b> / ${num(s.files)}권이 연결되어 있어요. 이 가운데 글자를 읽을 수 있는 책은 ${num(ok)}권이고, <a data-act="tsr-notext">스캔본·글자 깨짐 ${num((s.noText || []).length)}권</a>은 본문 검색이 안 돼요.</p>`;
-  } else if (s && !s.available) info = `<p class="tsr-warn">${esc(s.error === 'index-not-found' ? '서재 색인을 찾지 못했습니다. PDF 폴더 안에 _서재색인 폴더(한국어OCR 앱이 만든 색인)가 있어야 합니다.' : s.error || '색인을 열 수 없습니다.')}</p>`;
+  } else if (s && !s.available) info = `<p class="tsr-warn">${esc(s.error === 'index-not-found' ? '아직 본문 색인이 없습니다. 설정의 ‘본문 색인 만들기’에서 만들거나, PDF 폴더 안에 _서재색인 폴더(한국어OCR 앱이 만든 색인)를 두세요.' : s.error || '색인을 열 수 없습니다.')}</p>`;
   else info = '<p class="tsr-info">색인을 확인하는 중…</p>';
   return `<div class="tsr-help"><h2>서재 본문 검색</h2>
     <p>위 검색창에 낱말이나 성경 구절을 적고 Enter를 누르세요. 범위는 오른쪽 위에서 고를 수 있어요(전체 서재 · 지금 보는 분류·성경 책·읽기 목록 · 열어 둔 책).</p>
