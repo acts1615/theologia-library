@@ -107,6 +107,7 @@ function renderShell() {
           <option value="read">최근 읽은순</option><option value="recent">최근 추가순</option><option value="title">제목순</option><option value="author">저자순</option><option value="progress">진행률순</option>
         </select>
         <div class="seg viewseg" title="보기 방식"><button data-act="view" data-v="card" class="${S.view === 'card' ? 'on' : ''}">카드</button><button data-act="view" data-v="list" class="${S.view === 'list' ? 'on' : ''}">목록</button></div>
+        <button class="btn sm" id="split-open" title="여러 권을 나란히 놓고 보기 (2권·4권)">⫼ 분할</button>
         <span class="count" id="count"></span>
       </div>
       <div id="selbar" class="selbar" hidden></div>
@@ -838,6 +839,9 @@ document.addEventListener('keydown', (e) => {
 });
 
 // ---------- 리더 연동 ----------
+// 분할 화면의 한 칸: /?pane=파일ID 로 열리면 서재 화면 없이 읽기 화면만 보인다
+const PANE = new URLSearchParams(location.search).get('pane');
+if (PANE) document.body.classList.add('pane');
 window.TL = {
   api, esc, D, work, filesOf, fileById, toast,
   applyRecord(out) {
@@ -849,7 +853,9 @@ window.TL = {
     const ae = document.activeElement;
     if (ae && /input|textarea/i.test(ae.tagName) && $('#drawer').contains(ae)) renderList(); else renderAll();
   },
-  afterReader() { renderAll(); },
+  works: () => S.lib.works,
+  checkedWorks: () => [...S.checked],
+  afterReader() { if (PANE) { try { parent.postMessage({ tlPane: 'closed' }, location.origin); } catch {} return; } renderAll(); },
 };
 
 // ---------- 시작 ----------
@@ -895,6 +901,7 @@ document.addEventListener('click', async (e) => {
     S.ref = ref; S.settings = st; setLib(lib);
     { const v = document.querySelector('.brand .ver'); if (v) v.textContent = 'ver' + (st.version || ''); }
   } catch (e) { $('#content').innerHTML = `<div class="empty"><div class="big">서재를 불러오지 못했습니다</div><p>${esc(e.message)}</p></div>`; return; }
+  if (PANE) { const pg = Number(new URLSearchParams(location.search).get('page')) || 0; if (window.TLReader) window.TLReader.open({ fileId: PANE, page: pg || undefined }); return; }
   renderAll();
   refreshAll(); // 앱을 켤 때 연결된 폴더의 변경 사항을 조용히 반영
   setTimeout(loadSearchStatus, 1500);

@@ -365,3 +365,33 @@ input:disabled,textarea:disabled{-webkit-text-fill-color:#7d8178;background-colo
 .nt-prev a.pg,.md-art a.pg{color:#006199;text-decoration:underline dotted;cursor:pointer;white-space:nowrap}
 .nimg,.md-art img.nimg{max-width:100%;height:auto;border-radius:6px;margin:6px 0}
 #modal mark{background:#95BDD7;color:inherit;border-radius:3px;padding:0 1px}
+
+/* ---------- 분할 화면 ---------- */
+body.pane #app{display:none}
+body.pane .reader{left:0!important}
+body.pane [data-act=side-toggle]{display:none!important}
+body.pane [data-r=close],body.pane [data-e=close],body.pane [data-m=close]{font-size:0}
+body.pane [data-r=close]::after,body.pane [data-e=close]::after,body.pane [data-m=close]::after{content:'✕ 칸 비우기';font-size:13px}
+body.pane .toasts{z-index:300}
+#split{position:fixed;inset:0;z-index:150;background:#2f2f2c;display:flex;flex-direction:column;color:var(--ink)}
+#split .sp-bar{display:flex;align-items:center;gap:8px;padding:8px 14px;background:var(--paper);border-bottom:1px solid var(--line-strong);flex:none}
+#split .sp-bar b{font-size:14px;margin-right:6px}
+#split .sp-bar .on{background:var(--olive);border-color:var(--olive);color:#fff}
+#split .sp-bar .sp-sp{flex:1}
+#split .sp-bar small{color:var(--muted)}
+#split .sp-grid{flex:1;min-height:0;display:grid;gap:4px;padding:4px}
+#split .sp-grid.l2{grid-template-columns:1fr 1fr;grid-template-rows:1fr}
+#split .sp-grid.l2v{grid-template-columns:1fr;grid-template-rows:1fr 1fr}
+#split .sp-grid.l4{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
+#split .sp-pane{position:relative;min-width:0;min-height:0;background:#4a4a46;border-radius:6px;overflow:hidden;outline:2px solid transparent}
+#split .sp-pane.act{outline-color:var(--olive)}
+#split .sp-pane iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#4a4a46}
+#split .sp-pick{position:absolute;inset:0;background:var(--paper);display:flex;flex-direction:column;gap:8px;padding:14px;overflow:hidden}
+#split .sp-pick h4{margin:0;font-size:14px}
+#split .sp-pick input{width:100%;padding:8px 10px;border:1px solid var(--line-strong);border-radius:8px;background:var(--card);outline:none}
+#split .sp-list{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:2px}
+#split .sp-it{display:block;width:100%;text-align:left;padding:7px 9px;border:0;background:transparent;border-radius:7px;cursor:pointer}
+#split .sp-it:hover{background:var(--olive-pale)}
+#split .sp-it b{display:block;font:600 13.5px/1.35 var(--serif)}
+#split .sp-it small{color:var(--muted)}
+#split .sp-empty{color:var(--muted);font-size:13px;padding:6px 2px}
