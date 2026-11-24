@@ -35,7 +35,7 @@ function setLayout(layout) {
 }
 function render() {
   const t = TL();
-  const bar = `<div class="sp-bar"><b>⫼ 분할 화면</b>${Object.entries(LAYOUTS).map(([k, v]) => `<button class="btn sm ${SP.layout === k ? 'on' : ''}" data-sp="layout" data-v="${k}">${v[0]}</button>`).join('')}<span class="sp-sp"></span><small>칸 위쪽의 “✕ 칸 비우기”로 다른 책을 고를 수 있습니다</small><button class="btn sm" data-sp="exit">닫기</button></div>`;
+  const bar = `<div class="sp-bar"><button class="btn sm" data-act="side-toggle" title="사이드바 접기·펴기 (Ctrl+B)" aria-label="사이드바 접기·펴기">☰</button><b>⫼ 분할 화면</b>${Object.entries(LAYOUTS).map(([k, v]) => `<button class="btn sm ${SP.layout === k ? 'on' : ''}" data-sp="layout" data-v="${k}">${v[0]}</button>`).join('')}<span class="sp-sp"></span><small>칸 위쪽의 “✕ 칸 비우기”로 다른 책을 고를 수 있습니다</small><button class="btn sm" data-sp="exit">닫기</button></div>`;
   SP.el.innerHTML = bar + `<div class="sp-grid ${SP.layout}">${SP.panes.map((p, i) => `<div class="sp-pane ${i === SP.act ? 'act' : ''}" data-i="${i}"></div>`).join('')}</div>`;
   SP.panes.forEach((p, i) => paneFill(i));
 }
