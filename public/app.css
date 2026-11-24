@@ -174,7 +174,7 @@ a.btn:hover{color:var(--olive-deep)}
 .r-msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#ddd;font-size:15px;padding:30px;text-align:center}.r-msg.err{color:#f3b9a0}
 .textLayer{position:absolute;inset:0;overflow:clip;opacity:1;line-height:1;text-size-adjust:none;forced-color-adjust:none;transform-origin:0 0;caret-color:CanvasText;z-index:0}
 .textLayer :is(span,br){color:transparent;position:absolute;white-space:pre;cursor:text;transform-origin:0% 0%}
-.textLayer ::selection{background:rgba(149,189,215,.6)}
+.textLayer ::selection{background:rgba(149,189,215,.6);color:transparent}
 .textLayer br::selection{background:transparent}
 .textLayer .endOfContent{display:block;position:absolute;inset:100% 0 0;z-index:-1;cursor:default;user-select:none}
 .textLayer.selecting .endOfContent{top:0}
