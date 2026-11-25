@@ -54,8 +54,10 @@ function createServer({ publicDir, dataDir, settingsDirs = [], restart = null })
   // 월간지(묵상과 설교·생명의삶플러스)는 이름에서 출판사와 연도를 채운다. 비어 있는 칸만 채우고, 직접 쓴 값은 건드리지 않는다.
   function fillMagazines() {
     let n = 0;
-    for (const w of store.snapshot().works) {
-      const mg = L.magazineInfo(w.title, store.filesOfWork(w.id).map((f) => f.name)); if (!mg) continue;
+    const snap = store.snapshot(); const names = new Map();   // 책마다 파일을 따로 훑으면 서재가 클수록 몇 초씩 멈추므로 한 번에 묶어 둔다
+    for (const f of snap.files) { let a = names.get(f.workId); if (!a) names.set(f.workId, (a = [])); a.push(f.name); }
+    for (const w of snap.works) {
+      const mg = L.magazineInfo(w.title, names.get(w.id) || []); if (!mg) continue;
       const patch = {};
       if (mg.publisher && !w.publisher) patch.publisher = mg.publisher;
       if (mg.year && !w.year) patch.year = mg.year;
