@@ -6,3 +6,4 @@
 | [pdf.js](https://github.com/mozilla/pdf.js) (`public/vendor/pdfjs`) | Apache-2.0 | PDF 읽기 |
 | [fflate](https://github.com/101arrowz/fflate) | MIT | EPUB 압축 해제 |
 | [fast-xml-parser](https://github.com/NaturalIntelligence/fast-xml-parser) | MIT | EPUB 목차·정보 해석 |
+| 개역한글 성경 본문 (`bible-krv.json`) | 저작권 만료(공개 도메인) | 성경 노트의 본문 표시 |

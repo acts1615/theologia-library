@@ -7,6 +7,8 @@ const L = require('./logic');
 const { createStore } = require('./store');
 const EPUB = require('./epub');
 const { createNotes } = require('./notes');
+const { createBibleNotes } = require('./biblenote');
+const { parseQuery: parseBibleQuery } = require('./bible');
 const { createUpdater } = require('./updater');
 
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'application/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.ico': 'image/x-icon', '.woff': 'font/woff', '.woff2': 'font/woff2', '.ttf': 'font/ttf', '.map': 'application/json', '.mjs': 'application/javascript; charset=utf-8', '.wasm': 'application/wasm', '.bcmap': 'application/octet-stream', '.pfb': 'application/octet-stream', '.icc': 'application/octet-stream' };
@@ -27,7 +29,7 @@ function readBody(req, limit = 80 * 1024 * 1024) {
 // 서점 API 키: data/settings.json (exe 옆 settings.json 도 읽음)
 function createSettings(dataDir, extraDirs = []) {
   const file = path.join(dataDir, 'settings.json');
-  const KEYS = ['KAKAO_REST_API_KEY', 'SEARCH_INDEX_PATH', 'NL_CERT_KEY', 'NOTES_DIR'];
+  const KEYS = ['KAKAO_REST_API_KEY', 'SEARCH_INDEX_PATH', 'NL_CERT_KEY', 'NOTES_DIR', 'BIBLE_NOTES_DIR'];
   const apply = (obj) => { for (const k of KEYS) if (obj && typeof obj[k] === 'string' && obj[k].trim()) process.env[k] = obj[k].trim(); };
   for (const d of [...extraDirs, dataDir]) { try { apply(JSON.parse(fs.readFileSync(path.join(d, 'settings.json'), 'utf8'))); } catch {} }
   return {
@@ -36,7 +38,7 @@ function createSettings(dataDir, extraDirs = []) {
       let cur = {}; try { cur = JSON.parse(fs.readFileSync(file, 'utf8')); } catch {}
       for (const k of KEYS) if (typeof input[k] === 'string') {
         const v = input[k].trim();
-        if (v && k === 'NOTES_DIR') { try { fs.mkdirSync(v, { recursive: true }); if (!fs.statSync(v).isDirectory()) throw new Error('x'); } catch { throw new Error('노트 폴더를 만들거나 열 수 없습니다. 경로를 확인해 주세요.'); } }
+        if (v && (k === 'NOTES_DIR' || k === 'BIBLE_NOTES_DIR')) { try { fs.mkdirSync(v, { recursive: true }); if (!fs.statSync(v).isDirectory()) throw new Error('x'); } catch { throw new Error('노트 폴더를 만들거나 열 수 없습니다. 경로를 확인해 주세요.'); } }
         if (v) { cur[k] = v; process.env[k] = v; } else { delete cur[k]; delete process.env[k]; }
       }
       fs.writeFileSync(file, JSON.stringify(cur, null, 2));
@@ -64,6 +66,8 @@ function createServer({ publicDir, dataDir, settingsDirs = [], restart = null })
   try { const n = fillMagazines(); if (n) console.log('월간지 정보 채움:', n); } catch (e) { console.error('magazine fill failed', e.message); }
   const settings = createSettings(dataDir, settingsDirs);
   const notes = createNotes(() => process.env.NOTES_DIR);
+  const bnotes = createNotes(() => process.env.BIBLE_NOTES_DIR);          // 성경 노트는 일반 노트 폴더와 따로 정한 폴더를 쓴다
+  const bibleNotes = createBibleNotes(bnotes);
   const cur = (() => { try { const b = require('./build.json'); return { seq: Number(b.seq) || 0, version: versionOf(b.seq) }; } catch { return { seq: 0, version: versionOf(0) }; } })();
   const updater = createUpdater({ dataDir, current: cur, restart });
   const search = require('./searchsvc.js').createSearch({ store, dataDir });
@@ -225,8 +229,15 @@ function createServer({ publicDir, dataDir, settingsDirs = [], restart = null })
       if (p.startsWith('/api/notes/')) {
         const host = String(req.headers.host || ''); const port = server.address().port;
         if (host !== `127.0.0.1:${port}` && host !== `localhost:${port}`) { res.writeHead(403); return res.end(); }
-        if (!notes.dir()) return sendJson(res, 400, { error: '설정에서 노트 폴더를 먼저 정해 주세요.' });
+        if (p === '/api/notes/bible/find' && m === 'GET') { const r = parseBibleQuery(url.searchParams.get('q')); if (!r) return sendJson(res, 200, { ok: false }); return sendJson(res, 200, { ok: true, book: r[0], chapter: Math.max(1, Math.floor(r[1] / 1000)), verse: r[1] % 1000 }); }
+        if (p === '/api/notes/bible/meta' && m === 'GET') return sendJson(res, 200, { books: bibleNotes.meta(), notesDir: process.env.BIBLE_NOTES_DIR || '' });
+        if (p.startsWith('/api/notes/bible') ? !bnotes.dir() : !notes.dir()) return sendJson(res, 400, { error: '설정에서 노트 폴더를 먼저 정해 주세요.' });
         try {
+          // 성경 노트: 책·장·절 메모를 그 장 파일(없으면 새로 만듦)에 카드로 넣는다
+          if (p === '/api/notes/bible' && m === 'POST') { const b = await readBody(req, 1024 * 1024); return sendJson(res, 200, await bibleNotes.add(b)); }
+          if (p === '/api/notes/bible' && m === 'GET') return sendJson(res, 200, await bibleNotes.chapter(url.searchParams.get('book'), url.searchParams.get('chapter')));
+          if (p === '/api/notes/bible/view' && m === 'GET') return sendJson(res, 200, await bibleNotes.view(url.searchParams.get('book'), url.searchParams.get('chapter')));
+          if (p === '/api/notes/bible' && (m === 'PUT' || m === 'DELETE')) { const b = await readBody(req, 1024 * 1024); return sendJson(res, 200, await bibleNotes.changeCard({ ...b, action: m === 'DELETE' ? 'delete' : 'edit' })); }
           if (p === '/api/notes/note' && m === 'GET') {
             const name = String(url.searchParams.get('name') || '').trim(); if (!name) return sendJson(res, 400, { error: '이름이 필요합니다.' });
             const wk = (n) => { const k = L.normalized(notes.safeName(n)); const w = store.snapshot().works.find((x) => L.normalized(notes.safeName(x.title)) === k); return w ? w.id : ''; };
