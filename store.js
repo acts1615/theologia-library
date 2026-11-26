@@ -21,9 +21,10 @@ function createStore(dataDir) {
     else { try { fs.copyFileSync(file, path.join(dataDir, 'library.v1.json')); } catch {} }
   } catch {}
 
-  let dirty = false, timer = null, backedUp = false;
+  let dirty = false, timer = null, backedUp = false, lastCost = 0;
   function flush() {
     if (!dirty) return;
+    const t0 = Date.now();
     try {
       if (!backedUp && fs.existsSync(file)) { try { fs.copyFileSync(file, path.join(dataDir, 'library.bak.json')); } catch {} backedUp = true; }
       const tmp = file + '.tmp';
@@ -31,8 +32,10 @@ function createStore(dataDir) {
       fs.renameSync(tmp, file);
       dirty = false;
     } catch (e) { console.error('library save failed:', e); }
+    lastCost = Date.now() - t0;
   }
-  function touch() { dirty = true; clearTimeout(timer); timer = setTimeout(flush, 250); }
+  // 서재가 크면 저장 한 번이 0.1초 넘게 앱을 멈추므로, 저장에 걸린 시간의 열다섯 배(최대 5초)만큼 모아서 저장한다
+  function touch() { dirty = true; clearTimeout(timer); timer = setTimeout(flush, Math.min(5000, Math.max(250, lastCost * 15))); }
   const nid = (p) => `${p}${state.nextId++}`;
   const workById = (id) => state.works.find((w) => w.id === id);
   const filesOf = (wid) => state.files.filter((f) => f.workId === wid);

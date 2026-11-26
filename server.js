@@ -161,6 +161,7 @@ function createServer({ publicDir, dataDir, settingsDirs = [], restart = null })
         const summary = store.scan(folderPath, files, { unavailable: b.unavailable === true }); try { store.classifyAll(); } catch {} try { fillMagazines(); } catch {}
         try { epubMeta(); } catch {}
         try { indexer.kick(60000); } catch {}
+        if (b.noLib === true) return sendJson(res, 200, { summary });   // 시작할 때 폴더 여러 개를 연달아 확인할 때는 마지막에만 서재를 돌려준다
         return sendJson(res, 200, { summary, library: store.snapshot() });
       }
       if (p === '/api/library/folders' && m === 'DELETE') {

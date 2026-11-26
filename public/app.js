@@ -728,9 +728,9 @@ function busy(msg) {
   if (!o) { o = document.createElement('div'); o.className = 'overlay-busy'; document.body.appendChild(o); }
   o.textContent = msg;
 }
-async function ingest(folder, files, unavailable) {
-  const r = await api('/api/library/scan', 'POST', { folderPath: folder, files, unavailable: !!unavailable });
-  setLib(r.library); return r.summary;
+async function ingest(folder, files, unavailable, more) {
+  const r = await api('/api/library/scan', 'POST', { folderPath: folder, files, unavailable: !!unavailable, noLib: !!more });
+  if (r.library) setLib(r.library); return r.summary;
 }
 async function addFolder() {
   if (!D) return toast('폴더 연결은 데스크톱 앱에서만 사용할 수 있습니다.', true);
@@ -745,11 +745,11 @@ async function addFolder() {
   } catch (e) { toast('폴더를 등록하지 못했습니다: ' + e.message, true); }
   finally { busy(''); }
 }
-async function rescan(folder, silent) {
+async function rescan(folder, silent, more) {
   if (!D) return;
   try {
     const r = await D.scanFolder(folder);
-    const s = r.ok ? await ingest(folder, r.files) : await ingest(folder, [], true);
+    const s = r.ok ? await ingest(folder, r.files, false, more) : await ingest(folder, [], true, more);
     if (!silent) { renderAll(); toast(!r.ok ? '폴더를 찾을 수 없습니다. 드라이브 연결을 확인해 주세요.' : s.added || s.missing ? `새 파일 ${num(s.added)}개, 사라진 파일 ${num(s.missing)}개를 반영했습니다.` : '변경된 내용이 없습니다.', !r.ok); }
     return s;
   } catch (e) { if (!silent) toast('스캔하지 못했습니다: ' + e.message, true); }
@@ -799,7 +799,8 @@ async function refreshAll() {
   if (!D || !S.lib.folders.length) return;
   S.refreshing = true; renderSide();
   let added = 0;
-  for (const f of [...S.lib.folders]) { const s = await rescan(f.path, true); if (s) added += s.added; }
+  const fl = [...S.lib.folders];
+  for (let i = 0; i < fl.length; i++) { const s = await rescan(fl[i].path, true, i < fl.length - 1); if (s) added += s.added; }
   S.refreshing = false; renderAll();
   if (added) toast(`폴더를 확인해서 새 PDF ${num(added)}개를 찾았습니다.`);
   autoFillAll();
