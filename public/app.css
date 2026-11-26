@@ -401,3 +401,27 @@ body.pane .toasts{z-index:300}
 .ix-row select,.ix-row input[type=number]{width:auto;max-width:100%}
 .ix-row input[type=checkbox]{width:auto;margin:0}
 .ix-chk{display:flex;gap:6px;align-items:center;font-size:13px}
+
+/* ---------- 형광펜 ---------- */
+.r-page{isolation:isolate}
+.hl-layer{position:absolute;inset:0;pointer-events:none;mix-blend-mode:multiply}
+.hl{position:absolute;border-radius:2px}
+.hl-yellow{background:rgba(255,226,0,.62)}.hl-green{background:rgba(110,225,120,.58)}.hl-pink{background:rgba(255,125,185,.52)}.hl-blue{background:rgba(105,195,255,.58)}
+.hl-dot{width:22px;height:22px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px #aaa;cursor:pointer;padding:0;display:inline-block;flex:none}
+.hl-dot.hl-yellow{background:#ffe84d}.hl-dot.hl-green{background:#7fe28a}.hl-dot.hl-pink{background:#ff9fcb}.hl-dot.hl-blue{background:#82cbff}
+.hl-dot.on{box-shadow:0 0 0 2px #222}
+.hl-bar{position:fixed;z-index:210;display:flex;gap:8px;align-items:center;background:#fff;border:1px solid #cfcfc4;border-radius:12px;padding:7px 10px;box-shadow:0 8px 24px rgba(0,0,0,.28)}
+.hl-bar .hl-note{width:170px;padding:5px 8px;border:1px solid #cfcfc4;border-radius:7px}
+.hlr{display:flex;gap:8px;align-items:flex-start;padding:7px 12px;border-bottom:1px solid #ecece4}
+.hlr a{flex:1;min-width:0;color:inherit;text-decoration:none;font-size:13px;line-height:1.5;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+.hlr a em{display:block;color:#666;font-style:normal;font-size:12px;margin-top:2px}
+.hlr a:hover{background:var(--olive-pale)}
+.hlr button{border:0;background:transparent;color:#999;cursor:pointer}
+.hlr .hl-dot{margin-top:3px;width:14px;height:14px}
+.hm-row{display:flex;gap:8px;align-items:flex-start;width:100%;text-align:left;padding:7px 8px;border:0;background:transparent;border-radius:8px;cursor:pointer}
+.hm-row:hover{background:var(--olive-pale)}
+.hm-row.gone{opacity:.55}
+.hm-t{flex:1;min-width:0;font-size:13.5px;line-height:1.55}
+.hm-t em{display:block;color:#666;font-style:normal;font-size:12px}
+.hm-bk{font-weight:600;margin:12px 0 2px;font-family:var(--serif)}
+#hm-c .btn.on{background:var(--olive);color:#fffef9}

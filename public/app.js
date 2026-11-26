@@ -158,7 +158,7 @@ function renderSide() {
     ${S.refreshing ? '<div class="busy"><i class="dot"></i>폴더 갱신 중…</div>' : ''}
     <h6>서재</h6>
     ${nav('all', '전체 문헌', cnt.all)}${nav('readlist', '★ 읽기 목록', cnt.readlist)}${nav('reading', '읽는 중', cnt.reading)}${nav('unread', '읽을 예정', cnt.unread)}${nav('finished', '완독', cnt.finished)}${nav('review', '확인 필요', cnt.review, true)}
-    <h6>노트</h6>${S.settings && S.settings.notesDir ? '<button class="nav" data-act="note-search"><span>✎ 노트 검색</span></button>' : ''}<button class="nav" data-act="bible-note"><span>✎ 성경 노트</span></button>
+    <h6>노트</h6>${S.settings && S.settings.notesDir ? '<button class="nav" data-act="note-search"><span>✎ 노트 검색</span></button>' : ''}<button class="nav" data-act="bible-note"><span>✎ 성경 노트</span></button><button class="nav" data-act="hl-all"><span>▰ 형광펜 모아보기</span></button>
     <h6>종류</h6>
     <button class="nav ${S.kind === '책' ? 'on' : ''}" data-act="kind" data-v="책"><span>📚 책</span><span class="n">${num(kcnt['책'])}</span></button><button class="nav ${S.kind === '논문' ? 'on' : ''}" data-act="kind" data-v="논문"><span>📄 논문</span><span class="n">${num(kcnt['논문'])}</span></button>
     <h6>성경 66권</h6>
@@ -683,6 +683,33 @@ document.addEventListener('click', async (e) => {
   const nm = t.dataset.nt || t.dataset.note; if (nm) openNote(nm).then(() => { const m = $('#modal h2'); if (m && NT) m.textContent = NT.name; });
 }, true);
 
+// ---------- 형광펜 모아보기 ----------
+const HLC = { yellow: '노랑', green: '초록', pink: '분홍', blue: '하늘' };
+function openHighlights() {
+  let color = '';
+  const m = modal('형광펜 모아보기', `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><input id="hm-q" type="search" placeholder="칠한 글·메모·책 제목 검색" autocomplete="off" style="flex:1;min-width:180px"><span id="hm-c" style="display:flex;gap:6px;align-items:center"><button class="btn sm on" data-c="">전체</button>${Object.keys(HLC).map((c) => `<button class="hl-dot hl-${c}" data-c="${c}" title="${HLC[c]}"></button>`).join('')}</span></div><div id="hm-res" style="margin-top:10px"></div>`, [{ label: '복사(마크다운)', fn: async () => { try { await navigator.clipboard.writeText(m._md || ''); toast('복사했습니다.'); } catch {} return true; } }, { label: '닫기' }]);
+  const q = m.querySelector('#hm-q'), box = m.querySelector('#hm-res'); let tm = 0, seq = 0;
+  async function run() {
+    const my = ++seq; let r;
+    try { r = await api('/api/hl?q=' + encodeURIComponent(q.value.trim()) + '&color=' + color); } catch (e) { box.innerHTML = `<div class="note-warn">${esc(e.message)}</div>`; return; }
+    if (my !== seq) return;
+    const items = r.items || []; if (!items.length) { box.innerHTML = '<p class="help">아직 칠한 글이 없습니다. PDF를 열어 글을 드래그하고 색을 고르면 여기에 차곡차곡 모입니다.</p>'; m._md = ''; return; }
+    const g = new Map(); for (const h of items) { const k = h.fileId; if (!g.has(k)) g.set(k, { h, list: [] }); g.get(k).list.push(h); }
+    let md = '', html = `<p class="help">${items.length}개 · 책 ${g.size}권</p>`;
+    for (const { h, list } of g.values()) {
+      const t = h.title || h.fileName || '(이름 없음)'; list.sort((a, b) => a.page - b.page);
+      html += `<div class="hm-bk">${esc(t)}${h.author ? ` <small style="font-weight:400;color:#777">${esc(h.author)}</small>` : ''}${h.exists === false ? ' <small style="color:#a55">(서재에서 빠진 책)</small>' : ''}</div>`;
+      md += `## ${t}\n`;
+      for (const x of list) { html += `<button class="hm-row${x.exists === false ? ' gone' : ''}" data-f="${esc(x.fileId)}" data-p="${x.page}"><span class="hl-dot hl-${x.color}" style="width:14px;height:14px;margin-top:4px"></span><span class="hm-t"><b>p.${x.page}</b> ${esc(x.text.slice(0, 300))}${x.note ? `<em>${esc(x.note)}</em>` : ''}</span></button>`; md += `- (p.${x.page}) ${x.text}${x.note ? ' — ' + x.note : ''}\n`; }
+      md += '\n';
+    }
+    box.innerHTML = html; m._md = md;
+  }
+  q.addEventListener('input', () => { clearTimeout(tm); tm = setTimeout(run, 250); });
+  m.querySelector('#hm-c').addEventListener('click', (e) => { const b = e.target.closest('[data-c]'); if (!b) return; color = b.dataset.c; m.querySelectorAll('#hm-c [data-c]').forEach((x) => x.classList.toggle('on', x === b)); run(); });
+  box.addEventListener('click', async (e) => { const b = e.target.closest('.hm-row'); if (!b) return; if (b.classList.contains('gone')) { toast('서재에서 빠진 책이라 열 수 없습니다.', true); return; } closeModal(); await window.TLReader.open({ fileId: b.dataset.f, page: +b.dataset.p }); });
+  run(); q.focus();
+}
 // ---------- 노트 검색 · 쪽으로 가기 ----------
 function noteSearchModal() {
   const m = modal('노트 검색', `<input id="ns-q" type="search" placeholder="노트 안의 글자·이름을 찾습니다 (띄어쓰기로 여러 낱말)" autocomplete="off" style="width:100%"><div id="ns-res" style="margin-top:10px"><p class="help">낱말을 입력하면 노트 폴더의 모든 노트에서 찾습니다. 결과를 누르면 그 노트가 열립니다.</p></div>`, [{ label: '닫기' }]);
@@ -856,6 +883,7 @@ document.addEventListener('click', async (e) => {
     case 'ok-review': queueSave(S.open, { review: false }); renderAll(); break;
     case 'bible': bibleModal(work(S.open)); break;
     case 'note-search': noteSearchModal(); break;
+    case 'hl-all': openHighlights(); break;
     case 'bible-note': if (window.TLBibleNote) window.TLBibleNote.open(); break;
     case 'note-open': openNote(work(v) ? work(v).title : '', v); break;
     case 'bookstore': bookstoreModal(work(S.open)); break;
@@ -924,6 +952,7 @@ window.TL = {
     const ae = document.activeElement;
     if (ae && /input|textarea/i.test(ae.tagName) && $('#drawer').contains(ae)) renderList(); else renderAll();
   },
+  openHighlights,
   works: () => S.lib.works,
   checkedWorks: () => [...S.checked],
   afterReader() { if (PANE) { try { parent.postMessage({ tlPane: 'closed' }, location.origin); } catch {} return; } renderAll(); },

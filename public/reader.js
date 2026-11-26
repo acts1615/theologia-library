@@ -70,7 +70,7 @@ async function open({ fileId, page, terms, best, pnum }) {
       <div class="r-scroll" id="r-scroll" tabindex="0"><div class="r-pages" id="r-pages"></div><div class="r-msg" id="r-msg">PDF를 여는 중…</div></div>
     </div>`;
   document.body.appendChild(el);
-  R = { el, file, work: w, doc: null, pdfjs: null, scale: 1.3333, fit: true, N: 0, base: null, pages: [], page: 1, recorded: 0,
+  R = { hl: [], el, file, work: w, doc: null, pdfjs: null, scale: 1.3333, fit: true, N: 0, base: null, pages: [], page: 1, recorded: 0,
         terms: (terms || []).map((t) => String(t).replace(/\s+/g, '').toLowerCase()).filter(Boolean), best: !!best, hits: new Map(), hi: -1, focusPage: (terms && terms.length && page) ? page : 0, pnum: pnum || [], rendered: new Map(), queue: [], active: 0, io: null, saveTimer: null, closed: false, token: Symbol(), toc: null, tab: 'toc', find: null, ptext: new Map(), marks: ((file.marks || []).map((m) => ({ ...m }))), mkTimer: null, mkEdit: '' };
   bind(el); mkCount();
   const token = R.token;
@@ -86,7 +86,7 @@ async function open({ fileId, page, terms, best, pnum }) {
     try { const z = JSON.parse(localStorage.getItem('tl-zoom') || 'null'); if (z && z.fit === false && z.scale > 0.3) { R.fit = false; R.scale = z.scale; } } catch {}
     $('#r-total').textContent = '/ ' + R.N; $('#r-page').max = R.N;
     $('#r-msg').remove();
-    buildPages(); loadPnum();
+    buildPages(); loadPnum(); loadHl();
     const start = clamp(page || (file.lastPage > 0 ? file.lastPage : 1), 1, R.N);
     goTo(start, true);
     // 처음 연 쪽도 기록 (열자마자 '읽는 중'으로 반영)
@@ -163,7 +163,7 @@ async function renderPage(n) {
   if (R !== Rr || rec.cancelled) return;
   const ph = host.querySelector('.r-ph'); if (ph) ph.remove();
   host.querySelectorAll(':scope > canvas, :scope > .textLayer').forEach((x) => { if (x.tagName === 'CANVAS') { x.width = 0; x.height = 0; } x.remove(); });   // 확대·축소 때 늘려 둔 옛 그림은 새 그림이 준비된 순간에 바꿔 끼운다
-  host.appendChild(canvas);
+  host.appendChild(canvas); drawHl(n);   // 형광펜은 그림 위·글자 층 아래에 깔린다
   const tl = document.createElement('div'); tl.className = 'textLayer';
   tl.style.setProperty('--scale-factor', String(sc)); tl.style.setProperty('--total-scale-factor', String(sc));
   host.appendChild(tl);
@@ -259,7 +259,7 @@ function release(n) {
   rec.cancelled = true; try { rec.task && rec.task.cancel(); } catch {} try { rec.text && rec.text.cancel(); } catch {}
   unmarkHits(R, n);
   const host = R.pages[n - 1];
-  if (host) { host.querySelectorAll('canvas').forEach((c) => { c.width = 0; c.height = 0; }); host.querySelectorAll('canvas,.textLayer').forEach((x) => x.remove()); if (!host.querySelector('.r-ph')) host.insertAdjacentHTML('afterbegin', `<span class="r-ph">${n}</span>`); }
+  if (host) { host.querySelectorAll('canvas').forEach((c) => { c.width = 0; c.height = 0; }); host.querySelectorAll('canvas,.textLayer,.hl-layer').forEach((x) => x.remove()); if (!host.querySelector('.r-ph')) host.insertAdjacentHTML('afterbegin', `<span class="r-ph">${n}</span>`); }
   try { rec.page && rec.page.cleanup(); } catch {}
   R.rendered.delete(n);
 }
@@ -267,6 +267,108 @@ function rebuild(keepPage) {
   if (!R || !R.N) return;
   for (const n of [...R.rendered.keys()]) release(n);
   R.queue = []; buildPages(); goTo(keepPage || R.page, true);
+}
+
+// ---------- 형광펜 ----------
+// 글을 드래그하면 색 단추가 뜨고, 누르면 칠해져서 data/highlights.json 에 자동으로 모인다. 위치는 쪽 크기에 대한 비율이라 확대해도 같은 자리에 칠해진다.
+const HL_COLORS = [['yellow', '노랑'], ['green', '초록'], ['pink', '분홍'], ['blue', '하늘']];
+async function loadHl() {
+  const r = R; if (!r) return;
+  try { const j = await TL().api('/api/hl?fileId=' + encodeURIComponent(r.file.id)); if (R !== r) return; r.hl = j.items || []; for (const d of r.pages) drawHl(+d.dataset.n); const b = $('#r-toc'); if (b && !b.hidden) renderToc(); } catch {}
+}
+function drawHl(n) {
+  const host = R && R.pages[n - 1]; if (!host) return;
+  host.querySelectorAll(':scope > .hl-layer').forEach((x) => x.remove());
+  const cv = host.querySelector(':scope > canvas'); if (!cv) return;   // 그림이 그려질 때 다시 깔린다
+  const items = R.hl.filter((h) => h.page === n); if (!items.length) return;
+  const layer = document.createElement('div'); layer.className = 'hl-layer';
+  for (const h of items) for (const r of h.rects) { const d = document.createElement('i'); d.className = 'hl hl-' + h.color; d.style.cssText = `left:${r[0] * 100}%;top:${r[1] * 100}%;width:${r[2] * 100}%;height:${r[3] * 100}%`; layer.appendChild(d); }
+  cv.after(layer);
+}
+function lineRects(list, hr) {
+  const a = [];
+  for (const r of list) {
+    const x1 = Math.max(r.left, hr.left), x2 = Math.min(r.right, hr.right), y1 = Math.max(r.top, hr.top), y2 = Math.min(r.bottom, hr.bottom);
+    if (x2 - x1 < 1.5 || y2 - y1 < 3 || y2 - y1 > hr.height * 0.4) continue;
+    a.push({ x1, x2, y1, y2 });
+  }
+  a.sort((p, q) => p.y1 - q.y1 || p.x1 - q.x1);
+  const out = [];
+  for (const r of a) {   // 같은 줄에서 이어지는 조각은 하나로 합친다
+    const m = out.find((o) => { const ov = Math.min(o.y2, r.y2) - Math.max(o.y1, r.y1); const hh = o.y2 - o.y1; return ov > 0.6 * Math.min(hh, r.y2 - r.y1) && r.x1 <= o.x2 + hh * 0.8 && r.x2 >= o.x1 - hh * 0.8; });
+    if (m) { m.x1 = Math.min(m.x1, r.x1); m.x2 = Math.max(m.x2, r.x2); m.y1 = Math.min(m.y1, r.y1); m.y2 = Math.max(m.y2, r.y2); } else out.push({ ...r });
+  }
+  return out.map((o) => [(o.x1 - hr.left) / hr.width, (o.y1 - hr.top) / hr.height, (o.x2 - o.x1) / hr.width, (o.y2 - o.y1) / hr.height]);
+}
+function hideBar() { const b = R && $('.hl-bar', R.el); if (b) b.remove(); if (R) { R.hlSel = null; R.hlEdit = null; } }
+function showBar(rect, edit) {
+  hideBar(); const t = TL();
+  const bar = document.createElement('div'); bar.className = 'hl-bar'; bar.dataset.mode = edit ? 'edit' : 'new';
+  bar.innerHTML = HL_COLORS.map(([c, n]) => `<button class="hl-dot hl-${c}${edit && edit.color === c ? ' on' : ''}" data-hl="${c}" title="${n}" aria-label="${n}"></button>`).join('')
+    + (edit ? `<input class="hl-note" placeholder="메모 (Enter)" value="${t.esc(edit.note || '')}" maxlength="500"><button class="btn sm" data-hl="del" title="이 형광펜 지우기">지우기</button>` : '<button class="btn sm" data-hl="copy" title="글 복사">복사</button>');
+  R.el.appendChild(bar);
+  const bw = bar.offsetWidth, bh = bar.offsetHeight;
+  let x = rect.left + rect.width / 2 - bw / 2, y = rect.top - bh - 10; if (y < 70) y = rect.bottom + 10;
+  bar.style.left = clamp(x, 8, innerWidth - bw - 8) + 'px'; bar.style.top = clamp(y, 8, innerHeight - bh - 8) + 'px';
+  const inp = $('.hl-note', bar); if (inp) inp.addEventListener('keydown', async (e) => { if (e.key === 'Enter') { e.preventDefault(); await saveNote(R.hlEdit, inp.value); hideBar(); } else if (e.key === 'Escape') { e.stopPropagation(); hideBar(); } });
+}
+function onSelUp(e) {
+  if (!R || e.target.closest('.hl-bar')) return;
+  const ev = { x: e.clientX, y: e.clientY, tgt: e.target }; const r0 = R;
+  setTimeout(() => {
+    if (R !== r0) return;
+    const sel = getSelection();
+    if (sel && !sel.isCollapsed && sel.rangeCount && sel.toString().trim()) {
+      const rg = sel.getRangeAt(0); const ca = rg.commonAncestorContainer; const el = ca.nodeType === 1 ? ca : ca.parentElement;
+      if (el && $('#r-scroll').contains(el)) { showBar(rg.getBoundingClientRect(), null); R.hlSel = rg.cloneRange(); return; }
+    }
+    const host = ev.tgt.closest && ev.tgt.closest('.r-page'); if (!host) { hideBar(); return; }
+    const hr = host.getBoundingClientRect(); const px = (ev.x - hr.left) / hr.width, py = (ev.y - hr.top) / hr.height; const n = +host.dataset.n;
+    const hit = R.hl.find((h) => h.page === n && h.rects.some((q) => px >= q[0] && px <= q[0] + q[2] && py >= q[1] && py <= q[1] + q[3]));
+    if (hit) { showBar({ left: ev.x, right: ev.x, top: ev.y, bottom: ev.y, width: 0 }, hit); R.hlEdit = hit.id; } else hideBar();
+  }, 12);
+}
+async function onHlClick(e) {
+  const b = e.target.closest('[data-hl]'); if (!b || !R) return;
+  const act = b.dataset.hl, mode = b.closest('.hl-bar').dataset.mode;
+  if (act === 'copy') { try { await navigator.clipboard.writeText(R.hlSel ? R.hlSel.toString() : ''); TL().toast('복사했습니다.'); } catch {} hideBar(); return; }
+  if (mode === 'new') return saveSel(act);
+  const id = R.hlEdit;
+  if (act === 'del') { hideBar(); return delHl(id); }
+  try { const h = await TL().api('/api/hl/' + id, 'PUT', { color: act }); const i = R.hl.findIndex((x) => x.id === id); if (i >= 0) { R.hl[i] = h; drawHl(h.page); } hideBar(); if (R.tab === 'hl') renderToc(); } catch (er) { TL().toast(er.message, true); }
+}
+async function saveNote(id, note) {
+  try { const h = await TL().api('/api/hl/' + id, 'PUT', { note }); const i = R.hl.findIndex((x) => x.id === id); if (i >= 0) R.hl[i] = h; if (R.tab === 'hl') renderToc(); } catch (er) { TL().toast(er.message, true); }
+}
+async function saveSel(color) {
+  const rg = R.hlSel; if (!rg) return; const out = [];
+  for (const host of R.pages) {
+    const tl = host.querySelector(':scope > .textLayer'); if (!tl || !rg.intersectsNode(tl)) continue;
+    const sub = rg.cloneRange(); if (!tl.contains(sub.startContainer)) sub.setStart(tl, 0); if (!tl.contains(sub.endContainer)) sub.setEnd(tl, tl.childNodes.length);
+    const text = sub.toString(); if (!text.trim()) continue;
+    const rects = lineRects(sub.getClientRects(), host.getBoundingClientRect()); if (rects.length) out.push({ page: +host.dataset.n, rects, text });
+  }
+  const r = R; hideBar(); try { getSelection().removeAllRanges(); } catch {}
+  if (!out.length) { TL().toast('칠할 글을 찾지 못했습니다.', true); return; }
+  for (const o of out) {
+    try { const h = await TL().api('/api/hl', 'POST', { fileId: r.file.id, color, page: o.page, rects: o.rects, text: o.text }); r.hl.push(h); if (R === r) drawHl(o.page); }
+    catch (er) { TL().toast('형광펜을 저장하지 못했습니다: ' + er.message, true); }
+  }
+  if (R === r && r.tab === 'hl') renderToc();
+  const sv = $('#r-save', r.el); if (sv) { sv.textContent = '형광펜 저장됨'; clearTimeout(r.hlSv); r.hlSv = setTimeout(() => { if (sv) sv.textContent = ''; }, 1800); }
+}
+async function delHl(id) {
+  const h = R.hl.find((x) => x.id === id); if (!h) return;
+  try { await TL().api('/api/hl/' + id, 'DELETE'); R.hl = R.hl.filter((x) => x.id !== id); drawHl(h.page); if (R.tab === 'hl') renderToc(); } catch (er) { TL().toast(er.message, true); }
+}
+function hlMd() { const t = R.work.title; return `## ${t}\n` + R.hl.slice().sort((a, b) => a.page - b.page).map((h) => `- (p.${h.page}) ${h.text}${h.note ? ' — ' + h.note : ''}`).join('\n'); }
+async function copyHl() { try { await navigator.clipboard.writeText(hlMd()); TL().toast('이 책의 형광펜을 복사했습니다.'); } catch {} }
+function renderHlTab() {
+  const box = $('#r-toc'); const t = TL();
+  const list = R.hl.slice().sort((a, b) => a.page - b.page || String(a.at).localeCompare(String(b.at)));
+  box.innerHTML = tabsHtml() + `<div class="tp-head"><button class="btn sm" data-r="hl-copy">이 책 모두 복사</button><button class="btn sm" data-r="hl-all" title="모든 책의 형광펜을 한곳에서 보기">전체 모아보기</button></div>`
+    + (list.length ? list.map((h) => `<div class="hlr" data-hid="${h.id}"><span class="hl-dot hl-${h.color}"></span><a href="#" data-r="hl-go" data-p="${h.page}"><b>p.${h.page}</b> ${t.esc(h.text.slice(0, 160))}${h.note ? `<em>${t.esc(h.note)}</em>` : ''}</a><button data-r="hl-del" title="지우기" aria-label="지우기">✕</button></div>`).join('')
+      : '<p class="help" style="padding:8px 12px">이 책의 글을 드래그하면 나오는 색 단추를 눌러 칠하세요. 칠한 글은 자동으로 저장되고, 책과 상관없이 ‘전체 모아보기’에서 한곳에 모아 볼 수 있습니다.</p>');
 }
 
 // 확대·축소·창 크기 변경: 쪽을 지우고 다시 만들지 않는다. 보이는 쪽은 옛 그림을 새 크기로 늘려 둔 채 바로 보여 주고,
@@ -357,14 +459,15 @@ async function flush(keepalive) {
 const printedLabel = (page) => { const n = R.pnum && R.pnum.length ? printedOf(R.pnum, page - 1) : null; return n != null ? ` · 인쇄 ${n}` : ''; };
 function mkCount() { const e = $('#r-mkn'); if (e) e.textContent = R && R.marks.length ? ` ${R.marks.length}` : ''; }
 function curMarkId() { let id = ''; for (const m of R.marks) { if (m.page <= R.page) id = m.id; else break; } return id; }
-function markCur() { const box = $('#r-toc'); if (!box || box.hidden || R.tab === 'find') return; const cur = curMarkId(); box.querySelectorAll('.mk').forEach((r) => r.classList.toggle('cur', r.dataset.mid === cur)); const ad = $('[data-r=mk-add]', box); if (ad) ad.textContent = `＋ 지금 쪽 (p.${R.page})`; }
+function markCur() { const box = $('#r-toc'); if (!box || box.hidden || R.tab === 'find' || R.tab === 'hl') return; const cur = curMarkId(); box.querySelectorAll('.mk').forEach((r) => r.classList.toggle('cur', r.dataset.mid === cur)); const ad = $('[data-r=mk-add]', box); if (ad) ad.textContent = `＋ 지금 쪽 (p.${R.page})`; }
 function tabsHtml() {
   const n = R.find && R.find.q ? R.find.hits : 0;
-  return `<div class="tp-tabs"><button data-r="tab-toc" class="${R.tab === 'find' ? '' : 'on'}">목차·책갈피</button><button data-r="tab-find" class="${R.tab === 'find' ? 'on' : ''}">검색 결과${n ? ` <span>${n}</span>` : ''}</button></div>`;
+  return `<div class="tp-tabs"><button data-r="tab-toc" class="${R.tab === 'find' || R.tab === 'hl' ? '' : 'on'}">목차·책갈피</button><button data-r="tab-find" class="${R.tab === 'find' ? 'on' : ''}">검색 결과${n ? ` <span>${n}</span>` : ''}</button><button data-r="tab-hl" class="${R.tab === 'hl' ? 'on' : ''}">형광펜${R.hl.length ? ` <span>${R.hl.length}</span>` : ''}</button></div>`;
 }
 function renderToc() {
   const box = $('#r-toc'); const t = TL(); if (!box || !R) return;
   if (R.tab === 'find') { renderFind(); return; }
+  if (R.tab === 'hl') { renderHlTab(); return; }
   const cur = curMarkId();
   const mrow = (m) => R.mkEdit === m.id
     ? `<div class="mk edit" data-mid="${m.id}" style="padding-left:${10 + m.level * 14}px"><input class="mk-in" value="${t.esc(m.title)}" placeholder="p.${m.page}" maxlength="200" /><small>p.${m.page}</small></div>`
@@ -570,6 +673,9 @@ function setZoom(mult) {
 function bind(el) {
   const sc = $('#r-scroll', el);
   sc.addEventListener('scroll', onScroll, { passive: true });
+  sc.addEventListener('mouseup', onSelUp);
+  el.addEventListener('mousedown', (e) => { if (!e.target.closest('.hl-bar')) hideBar(); });
+  el.addEventListener('click', onHlClick);
   el.addEventListener('click', async (e) => {
     const a = e.target.closest('[data-r],a[data-i]'); if (!a || !R) return;
     if (a.dataset.i != null && !a.dataset.r) { e.preventDefault(); gotoDest(R.tocMap.get(+a.dataset.i)); return; }
@@ -586,6 +692,11 @@ function bind(el) {
       case 'toc': { const box = $('#r-toc'); box.hidden = !box.hidden; if (!box.hidden) renderToc(); break; }
       case 'tab-toc': R.tab = 'toc'; renderToc(); break;
       case 'tab-find': R.tab = 'find'; renderToc(); break;
+      case 'tab-hl': R.tab = 'hl'; renderToc(); break;
+      case 'hl-go': e.preventDefault(); goTo(+a.dataset.p); break;
+      case 'hl-del': delHl(a.closest('.hlr').dataset.hid); break;
+      case 'hl-copy': copyHl(); break;
+      case 'hl-all': if (TL().openHighlights) TL().openHighlights(); break;
       case 'fd-go': { e.preventDefault(); if (R.find) { R.find.cur = +a.dataset.ri; markFindCur(false); } focusHit(+a.dataset.p, +a.dataset.k || 0); break; }
       case 'fd-more': if (R.find) { R.find.limit += 600; renderFind(); } break;
       case 'fd-stop': if (R.find) { R.find.token = Symbol(); R.find = { ...R.find, done: true, msg: '검색을 중단했습니다.' }; renderFind(); } break;

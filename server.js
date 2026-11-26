@@ -75,6 +75,7 @@ function createServer({ publicDir, dataDir, settingsDirs = [], restart = null })
   const search = require('./searchsvc.js').createSearch({ store, dataDir });
   const indexer = require('./indexsvc.js').createIndexer({ store, search, dataDir, publicDir });
   indexer.kick(45000);
+  const hl = require('./highlights.js').createHighlights({ dataDir, store });
   const indexHtml = path.join(publicDir, 'index.html');
   async function autofillOne(wid, force) {
     const w = store.workById(wid); if (!w) return { status: 'missing' };
@@ -343,6 +344,15 @@ function createServer({ publicDir, dataDir, settingsDirs = [], restart = null })
         return out ? sendJson(res, 200, store.snapshot()) : sendJson(res, 404, { error: '파일 또는 작품을 찾을 수 없습니다.' });
       }
 
+      if (p.startsWith('/api/hl')) {
+        try {
+          if (p === '/api/hl' && m === 'GET') return sendJson(res, 200, { items: url.searchParams.get('fileId') ? hl.forFile(url.searchParams.get('fileId')) : hl.all({ q: url.searchParams.get('q'), color: url.searchParams.get('color') }) });
+          if (p === '/api/hl' && m === 'POST') return sendJson(res, 200, hl.add(await readBody(req, 2 * 1024 * 1024)));
+          const mm = p.match(/^\/api\/hl\/([A-Za-z0-9_-]+)$/);
+          if (mm && m === 'PUT') return sendJson(res, 200, hl.update(mm[1], await readBody(req, 1024 * 1024)));
+          if (mm && m === 'DELETE') return sendJson(res, 200, hl.remove(mm[1]));
+        } catch (e) { return sendJson(res, 400, { error: e.message }); }
+      }
       if (p === '/api/index/status' && m === 'GET') return sendJson(res, 200, indexer.status());
       if (p === '/api/index/count' && m === 'POST') { const b = await readBody(req); return sendJson(res, 200, { count: await indexer.count(b) }); }
       if (p === '/api/index/start' && m === 'POST') { const b = await readBody(req); try { return sendJson(res, 200, await indexer.start(b)); } catch (e) { return sendJson(res, 400, { error: e.message }); } }
@@ -401,7 +411,7 @@ function createServer({ publicDir, dataDir, settingsDirs = [], restart = null })
       if (!res.headersSent) sendJson(res, 500, { error: '서버 오류가 발생했습니다.' }); else res.end();
     }
   });
-  server.on('close', () => { store.flush(); indexer.close(); search.close(); });
+  server.on('close', () => { store.flush(); hl.flush(); indexer.close(); search.close(); });
   server.flushStore = () => store.flush();
   return server;
 }
