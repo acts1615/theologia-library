@@ -162,6 +162,7 @@ async function renderPage(n) {
   try { await rec.task.promise; } catch { return; }
   if (R !== Rr || rec.cancelled) return;
   const ph = host.querySelector('.r-ph'); if (ph) ph.remove();
+  host.querySelectorAll(':scope > canvas, :scope > .textLayer').forEach((x) => { if (x.tagName === 'CANVAS') { x.width = 0; x.height = 0; } x.remove(); });   // 확대·축소 때 늘려 둔 옛 그림은 새 그림이 준비된 순간에 바꿔 끼운다
   host.appendChild(canvas);
   const tl = document.createElement('div'); tl.className = 'textLayer';
   tl.style.setProperty('--scale-factor', String(sc)); tl.style.setProperty('--total-scale-factor', String(sc));
@@ -266,6 +267,39 @@ function rebuild(keepPage) {
   if (!R || !R.N) return;
   for (const n of [...R.rendered.keys()]) release(n);
   R.queue = []; buildPages(); goTo(keepPage || R.page, true);
+}
+
+// 확대·축소·창 크기 변경: 쪽을 지우고 다시 만들지 않는다. 보이는 쪽은 옛 그림을 새 크기로 늘려 둔 채 바로 보여 주고,
+// 잠깐 뒤 선명한 그림을 그려 같은 자리에서 바꿔 끼운다(깜박임 없음). 화면 가운데에 보이던 곳은 그대로 가운데에 둔다.
+function nearView(el, sc, pad) { const a = sc.getBoundingClientRect(), b = el.getBoundingClientRect(); return b.bottom > a.top - pad && b.top < a.bottom + pad; }
+function softRescale(newScale) {
+  if (!R || !R.N || !R.base) return;
+  const sc = $('#r-scroll'); const host = $('#r-pages');
+  // 가운데에 보이던 위치 기억
+  const cy = sc.scrollTop + sc.clientHeight / 2; let an = R.pages[0], frac = 0;
+  for (const d of R.pages) { if (d.offsetTop + d.offsetHeight >= cy) { an = d; break; } an = d; }
+  if (an.offsetHeight) frac = (cy - an.offsetTop) / an.offsetHeight;
+  const hx = sc.scrollWidth ? (sc.scrollLeft + sc.clientWidth / 2) / sc.scrollWidth : 0.5;
+  R.cur = newScale;
+  const w = Math.round(R.base.width * newScale), h = Math.round(R.base.height * newScale);
+  for (const n of [...R.rendered.keys()]) {
+    const d = R.pages[n - 1]; const rec = R.rendered.get(n);
+    if (!d || !nearView(d, sc, 1400)) { release(n); continue; }
+    rec.cancelled = true; try { rec.task && rec.task.cancel(); } catch {} try { rec.text && rec.text.cancel(); } catch {}
+    unmarkHits(R, n); try { rec.page && rec.page.cleanup(); } catch {}
+    d.querySelectorAll(':scope > .textLayer').forEach((x) => x.remove());
+    R.rendered.delete(n);
+  }
+  R.queue = [];
+  for (const d of R.pages) {
+    d.style.width = w + 'px'; d.style.height = h + 'px';
+    d.querySelectorAll(':scope > canvas').forEach((c) => { c.style.width = w + 'px'; c.style.height = h + 'px'; });
+  }
+  $('#r-zoom').textContent = Math.round((newScale / CSS_UNITS) * 100) + '%';
+  sc.scrollTop = an.offsetTop + frac * an.offsetHeight - sc.clientHeight / 2;
+  sc.scrollLeft = hx * sc.scrollWidth - sc.clientWidth / 2;
+  clearTimeout(R.rz2);
+  R.rz2 = setTimeout(() => { if (!R) return; for (const d of R.pages) if (nearView(d, sc, 1400)) enqueue(+d.dataset.n); }, 140);
 }
 
 // ---------- 이동/현재 쪽 ----------
@@ -531,7 +565,7 @@ async function gotoDest(it) {
 function setZoom(mult) {
   R.fit = false; R.scale = clamp(R.cur * mult, 0.4, 4);
   try { localStorage.setItem('tl-zoom', JSON.stringify({ fit: false, scale: R.scale })); } catch {}
-  rebuild(R.page);
+  softRescale(R.scale);
 }
 function bind(el) {
   const sc = $('#r-scroll', el);
@@ -545,7 +579,7 @@ function bind(el) {
       case 'next': goTo(R.page + 1); break;
       case 'zin': setZoom(1.15); break;
       case 'zout': setZoom(1 / 1.15); break;
-      case 'fit': R.fit = true; try { localStorage.setItem('tl-zoom', JSON.stringify({ fit: true })); } catch {} rebuild(R.page); break;
+      case 'fit': R.fit = true; try { localStorage.setItem('tl-zoom', JSON.stringify({ fit: true })); } catch {} softRescale(effScale()); break;
       case 'hitoff': clearHits(); break;
       case 'hitprev': stepAny(-1); break;
       case 'hitnext': stepAny(1); break;
@@ -584,7 +618,7 @@ function bind(el) {
   tocBox.addEventListener('focusout', (e) => { if (e.target.classList && e.target.classList.contains('mk-in') && R && R.mkEdit) setTimeout(() => { if (R && R.mkEdit && !$('.mk-in:focus', tocBox)) finishEdit(true); }, 120); });
   const sel = $('#r-file', el);
   if (sel) sel.addEventListener('change', async () => { const id = sel.value; await close(true); open({ fileId: id }); });
-  let rz = 0; window.addEventListener('resize', () => { if (R && R.fit) { clearTimeout(rz); rz = setTimeout(() => R && R.fit && rebuild(R.page), 250); } });
+  let rz = 0; window.addEventListener('resize', () => { if (R && R.fit) { clearTimeout(rz); rz = setTimeout(() => R && R.fit && softRescale(effScale()), 200); } });
   sc.addEventListener('wheel', (e) => { if (e.ctrlKey && R) { e.preventDefault(); clearTimeout(R.wz); R.wz = setTimeout(() => setZoom(e.deltaY < 0 ? 1.1 : 1 / 1.1), 60); } }, { passive: false });
 }
 document.addEventListener('keydown', (e) => {
