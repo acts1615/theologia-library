@@ -26,12 +26,12 @@ const NAMES = []; for (const b of BOOKS) for (const n of [b[1], ...b[2]]) NAMES.
 NAMES.sort((a, b) => b.length - a.length);
 const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const REF = new RegExp(
-  '(?<![가-힣A-Za-z0-9])(?<book>' + [...new Set(NAMES)].map(esc).join('|') + ')\\s*(?<ch>\\d{1,3})\\s*(?:(?<jang>[장편])\\s*(?:(?<v1>\\d{1,3})(?:\\s*[-–~]\\s*(?<v2>\\d{1,3}))?\\s*절?)?|:\\s*(?<v1b>\\d{1,3})(?:\\s*[-–~]\\s*(?<v2b>\\d{1,3}))?)' +
-  '|(?<![\\d:가-힣A-Za-z])(?<bch>\\d{1,3}):(?<bv1>\\d{1,3})(?:[-–~](?<bv2>\\d{1,3}))?(?!\\d)', 'g');
+  '(?<![가-힣A-Za-z0-9])(?<book>' + [...new Set(NAMES)].map(esc).join('|') + ')\\s*제?\\s*(?<ch>\\d{1,3})\\s*(?:(?<jang>[장편])\\s*(?:(?<v1>\\d{1,3})(?:\\s*[-–~]\\s*(?<v2>\\d{1,3}))?\\s*절?)?|[:：]\\s*(?<v1b>\\d{1,3})(?:\\s*[-–~]\\s*(?<v2b>\\d{1,3}))?)' +
+  '|(?<![\\d:가-힣A-Za-z])(?<bch>\\d{1,3})[:：](?<bv1>\\d{1,3})(?:[-–~](?<bv2>\\d{1,3}))?(?!\\d)', 'g');
 
 function linkRefs(text, curBid, nameOf) {
   const added = [];
-  const out = String(text).split('\n').map((line) => {
+  const out = String(text).normalize('NFC').split('\n').map((line) => {
     if (/^\s*!?\[\[/.test(line) && !/\s/.test(line.trim())) return line;
     const spans = [...line.matchAll(/\[\[.*?\]\]/g)].map((m) => [m.index, m.index + m[0].length]);
     let res = '', pos = 0, last = curBid; REF.lastIndex = 0; let m;
@@ -189,7 +189,7 @@ function scanMentions(text, ownBid, ownCh) {
   const lines = String(text).split(/\r?\n/);
   if (lines[0] === '---') { inFm = true; k = 1; }
   for (; k < lines.length; k++) {
-    const line = lines[k];
+    const line = lines[k].normalize('NFC');
     if (inFm) { if (line === '---') inFm = false; continue; }
     const h = VERSE_H.exec(line); if (h) { ctxV = +h[1]; continue; }
     if (/^\*\*/.test(line) && !/^> /.test(line)) continue;               // 본문 줄은 건너뜀
