@@ -266,6 +266,9 @@ var PART_PATTERNS = [
   /(?:^|[\s._-])([0-9]+)\s*(?:권|부|편)(?:$|[\s._-])/i,
   /(?:^|[\s._-])([0-9]+)\s*(?:of|중|\/|-)\s*[0-9]+(?:$|[\s._-])/i
 ];
+// 이름 끝의 낱 숫자('사사기 소고 2') — 같은 제목이 여럿으로 묶일 때 권수로 본다
+var PART_TAIL = /^(.*[가-힣a-z].*?)\s([0-9]{1,2})$/i;
+PART_PATTERNS.push(PART_TAIL);
 var NOISE = /(?:scan|scanned|ebook|e-book|pdf|final|edited|ocr|본문|스캔본|완역|개정판|copy|복사본|\[[^\]]*\]|\([^)]*\))/gi;
 function normalizePdfTitle(value) {
   return value.normalize("NFKC").replace(/\.(?:pdf|epub|md|markdown)$/i, "").replace(NOISE, " ").replace(/[“”"'‘’]/g, "").replace(/[,:;·|]+/g, " ").replace(/\s+/g, " ").trim().toLocaleLowerCase("ko-KR");
@@ -275,6 +278,7 @@ function extractPartNumber(value) {
   for (const pattern of PART_PATTERNS) {
     const match = normalized2.match(pattern);
     if (!match) continue;
+    if (pattern === PART_TAIL) { const n = Number.parseInt(match[2], 10); if (n > 0 && n < 100) return n; continue; }
     const token = match[1]?.toLowerCase();
     if (!token) return void 0;
     if (match[2] && /^[ivxlcdm]+$/i.test(token)) return romanToNumber(token) * 10 + Number.parseInt(match[2], 10);
@@ -358,12 +362,13 @@ function normalized(value) {
 }
 
 // ---- 표시용 제목: 파일명에서 확장자·권 표시·스캔 표기를 걷어낸다 ----
-function displayTitle(name) {
+function displayTitle(name, multi) {
   let t = String(name).normalize('NFC').replace(/\.(?:pdf|epub|md|markdown)$/i, '');
   t = t.replace(/[\[(（【][^\])）】]*(?:scan|scanned|ocr|ebook|e-book|스캔|완역|개정|복사)[^\])）】]*[\])）】]/gi, ' ');
   t = t.replace(/(?:^|[\s._-])(?:part|pt|volume|vol|book)\s*[-_. ]*(?:\d+|[ivxlcdm]+)(?=$|[\s._-])/gi, ' ');
   t = t.replace(/(?:^|[\s._-])제?\s*\d+\s*(?:권|부|편)(?=$|[\s._-])/g, ' ');
   t = t.replace(/(?:^|[\s._-])(?:상권|하권)(?=$|[\s._-])/g, ' ');
+  if (multi) t = t.replace(/(?<![.,\d])\s+\d{1,2}(?=\s*(?:[\[(（【].*)?$)/, '');   // 여러 권으로 묶일 때 끝의 권 번호('사사기 소고 1')는 제목에서 뺀다
   t = t.replace(/_+/g, ' ').replace(/[\s\-–.]+$/, '').replace(/^[\s\-–.]+/, '').replace(/\s+/g, ' ').trim();
   return t || String(name).replace(/\.(?:pdf|epub|md|markdown)$/i, '');
 }

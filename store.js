@@ -50,6 +50,19 @@ function createStore(dataDir) {
     return w;
   }
 
+  // 여러 권으로 묶인 작품: 권 번호가 비어 있으면 파일 이름에서 채우고, 제목이 첫 권 이름 그대로면 끝의 권 번호를 뺀다
+  function repairParts() {
+    let n = 0;
+    for (const w of state.works) {
+      const fs = state.files.filter((f) => f.workId === w.id); if (fs.length < 2) continue;
+      for (const f of fs) if (f.partNumber == null) { const p = L.extractPartNumber(L.canonName(f.name)); if (p != null) { f.partNumber = p; n++; } }
+      const nums = fs.map((f) => f.partNumber); if (nums.some((x) => x == null) || new Set(nums).size !== nums.length) continue;
+      const lo = fs.slice().sort((a, b) => a.partNumber - b.partNumber)[0];
+      if (w.title === L.displayTitle(lo.name)) { const t = L.displayTitle(lo.name, true); if (t && t !== w.title) { w.title = t; n++; } }
+    }
+    if (n) touch();
+    return n;
+  }
   function scan(folderPath, scanned, opts = {}) {
     const now = new Date().toISOString();
     let folder = state.folders.find((f) => key(f.path) === key(folderPath));
@@ -79,7 +92,7 @@ function createStore(dataDir) {
       const byTitleKey = new Map(); for (const x of state.works) if (!byTitleKey.has(x.titleKey)) byTitleKey.set(x.titleKey, x);
       for (const g of L.groupPdfFiles(canon)) {
         const first = g.files[0];
-        const title = L.displayTitle(first.origName);
+        const title = L.displayTitle(first.origName, g.files.length > 1);
         const tkey = L.normalized(g.title) || L.normalized(title);
         let w = byTitleKey.get(tkey);
         if (!w) { w = newWork(title, first, { review: g.files.length > 1 }); w.titleKey = tkey; byTitleKey.set(tkey, w); addedWorks++; }
@@ -95,6 +108,7 @@ function createStore(dataDir) {
         if (g.files.length > 1) grouped += g.files.length;
       }
     }
+    repairParts();
     for (const w of state.works) if (w.autoProgress) recompute(w);
     folder.fileCount = state.files.filter((f) => isUnder(f.path, folderPath) && !f.missing).length;
     touch();
@@ -322,6 +336,7 @@ function createStore(dataDir) {
   }
   function snapshot() { return { version: VERSION, folders: state.folders, works: state.works, files: state.files }; }
 
+  try { repairParts(); } catch {}
   return { fileById, setFilePages, setFileProgress, setFileMarks, scan, updateWork, mergeWorks, detachFile, moveFile, deleteWork, removeFolder, applyCandidate, fillEmpty, markSkip, classifyAll, confirmClass, filesOfWork, snapshot, raw, restore, flush, workById };
 }
 

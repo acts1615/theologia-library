@@ -180,7 +180,7 @@ function renderBibleSelect() {
 function card(w) {
   const files = filesOf(w), p = pct(w), tone = TONES[hash(w.id) % TONES.length];
   const img = w.coverUrl && /^(https?:|\/api\/epub\/)/i.test(w.coverUrl);
-  const chips = [`<span class="chip">PDF ${files.length}</span>`];
+  const chips = [`<span class="chip">${files.length > 1 && files.every((f) => f.partNumber != null) ? `PDF ${files.length}권 (${files.map((f) => f.partNumber).sort((x, y) => x - y).join('·')})` : `PDF ${files.length}`}</span>`];
   if (w.status !== 'unread') chips.push(`<span class="chip ${w.status}">${STATUS[w.status]}</span>`);
   if (w.lastReadAt && w.status !== 'finished') { const rf = resumeFile(w); if (rf) chips.push(`<span class="chip reading">p.${rf.lastPage} 까지</span>`); }
   if (w.review) chips.push('<span class="chip warn">그룹 확인</span>');
