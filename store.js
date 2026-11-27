@@ -50,18 +50,29 @@ function createStore(dataDir) {
     return w;
   }
 
-  // 여러 권으로 묶인 작품: 권 번호가 비어 있으면 파일 이름에서 채우고, 제목이 첫 권 이름 그대로면 끝의 권 번호를 뺀다
-  function repairParts() {
-    let n = 0;
-    for (const w of state.works) {
+  // 이름이 다른 파일이 한 작품에 섞여 있으면 파일마다 따로 작품으로 가른다 (같은 이름의 복사본끼리만 묶어 둔다). 작품마다 한 번만 한다.
+  const stem = (n) => String(n).normalize('NFC').replace(/\.(?:pdf|epub|md|markdown)$/i, '');
+  const nameKey = (n) => L.normalized(stem(L.canonName(n)));
+  function splitVolumes() {
+    let made = 0;
+    for (const w of state.works.slice()) {
+      if (w.volSplit) continue;
       const fs = state.files.filter((f) => f.workId === w.id); if (fs.length < 2) continue;
-      for (const f of fs) if (f.partNumber == null) { const p = L.extractPartNumber(L.canonName(f.name)); if (p != null) { f.partNumber = p; n++; } }
-      const nums = fs.map((f) => f.partNumber); if (nums.some((x) => x == null) || new Set(nums).size !== nums.length) continue;
-      const lo = fs.slice().sort((a, b) => a.partNumber - b.partNumber)[0];
-      if (w.title === L.displayTitle(lo.name)) { const t = L.displayTitle(lo.name, true); if (t && t !== w.title) { w.title = t; n++; } }
+      w.volSplit = true;
+      const by = new Map(); for (const f of fs) { const k = nameKey(f.name); if (!by.has(k)) by.set(k, []); by.get(k).push(f); }
+      if (by.size < 2) continue;
+      const keys = [...by.keys()]; const keep = keys.includes(w.titleKey) ? w.titleKey : keys[0];
+      const edited = !fs.some((f) => w.title === L.displayTitle(f.name));
+      for (const k of keys) {
+        const list = by.get(k); if (k === keep) continue;
+        const nw = newWork(stem(list[0].name), list[0], { author: w.author, category: w.category, categories: (w.categories || []).slice(), bibleBooks: (w.bibleBooks || []).slice(), tags: (w.tags || []).slice(), volSplit: true });
+        nw.titleKey = k; for (const f of list) f.workId = nw.id; recompute(nw); made++;
+      }
+      if (!edited) w.title = stem(by.get(keep)[0].name);
+      w.titleKey = keep; w.review = false; recompute(w);
     }
-    if (n) touch();
-    return n;
+    if (made) touch();
+    return made;
   }
   function scan(folderPath, scanned, opts = {}) {
     const now = new Date().toISOString();
@@ -92,7 +103,7 @@ function createStore(dataDir) {
       const byTitleKey = new Map(); for (const x of state.works) if (!byTitleKey.has(x.titleKey)) byTitleKey.set(x.titleKey, x);
       for (const g of L.groupPdfFiles(canon)) {
         const first = g.files[0];
-        const title = L.displayTitle(first.origName, g.files.length > 1);
+        const title = stem(first.origName);
         const tkey = L.normalized(g.title) || L.normalized(title);
         let w = byTitleKey.get(tkey);
         if (!w) { w = newWork(title, first, { review: g.files.length > 1 }); w.titleKey = tkey; byTitleKey.set(tkey, w); addedWorks++; }
@@ -108,7 +119,6 @@ function createStore(dataDir) {
         if (g.files.length > 1) grouped += g.files.length;
       }
     }
-    repairParts();
     for (const w of state.works) if (w.autoProgress) recompute(w);
     folder.fileCount = state.files.filter((f) => isUnder(f.path, folderPath) && !f.missing).length;
     touch();
@@ -204,7 +214,7 @@ function createStore(dataDir) {
       if (!target.note && w.note) target.note = w.note;
       state.works = state.works.filter((x) => x.id !== id);
     }
-    target.review = false;
+    target.review = false; target.volSplit = true;   // 손으로 합친 것은 다시 가르지 않는다
     recompute(target);
     touch();
     return target;
@@ -336,7 +346,7 @@ function createStore(dataDir) {
   }
   function snapshot() { return { version: VERSION, folders: state.folders, works: state.works, files: state.files }; }
 
-  try { repairParts(); } catch {}
+  try { splitVolumes(); } catch {}
   return { fileById, setFilePages, setFileProgress, setFileMarks, scan, updateWork, mergeWorks, detachFile, moveFile, deleteWork, removeFolder, applyCandidate, fillEmpty, markSkip, classifyAll, confirmClass, filesOfWork, snapshot, raw, restore, flush, workById };
 }
 

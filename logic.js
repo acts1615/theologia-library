@@ -312,7 +312,7 @@ function removePartMarker(value) {
 function groupPdfFiles(files) {
   const prepared = files.map((file) => ({
     ...file,
-    normalizedTitle: removePartMarker(file.name),
+    normalizedTitle: normalized(String(file.name).normalize('NFC').replace(/\.(?:pdf|epub|md|markdown)$/i, '')),
     partNumber: extractPartNumber(file.name)
   }));
   // 성능: 4000개 이상에서도 빠르도록 토큰·폴더를 한 번만 계산하고, 같은 제목은 Map 으로 찾는다. (결과는 이전 방식과 같다)
@@ -325,19 +325,8 @@ function groupPdfFiles(files) {
       sameKey.files.push(file);
       continue;
     }
-    const ft = tokens(file.normalizedTitle); const fdir = dirOf(file.path);
-    let candidate = null;
-    for (const group of groups) {
-      const a = group.seedTokens.size, b = ft.size;
-      // 자카드 유사도는 (작은 쪽 / 큰 쪽) 을 넘을 수 없다: 0.72 에 못 미치면 건너뛴다
-      if (Math.min(a, b) < 0.72 * Math.max(a, b)) continue;
-      const similarity = jaccard(group.seedTokens, ft);
-      if (similarity >= 0.72 && (group.seedDir === fdir || similarity >= 0.86)) { candidate = group; break; }
-    }
-    if (candidate) {
-      candidate.files.push(file);
-      continue;
-    }
+    const ft = tokens(file.normalizedTitle); const fdir = dirOf(file.path);   // 이름이 다르면 비슷해도 묶지 않는다: 권마다·파일마다 따로
+    const candidate = null;
     const g = { seed: file, files: [file], seedTokens: ft, seedDir: fdir };
     groups.push(g); byKey.set(file.normalizedTitle, g);
   }
@@ -362,15 +351,21 @@ function normalized(value) {
 }
 
 // ---- 표시용 제목: 파일명에서 확장자·권 표시·스캔 표기를 걷어낸다 ----
-function displayTitle(name, multi) {
+function displayTitle(name) {
   let t = String(name).normalize('NFC').replace(/\.(?:pdf|epub|md|markdown)$/i, '');
   t = t.replace(/[\[(（【][^\])）】]*(?:scan|scanned|ocr|ebook|e-book|스캔|완역|개정|복사)[^\])）】]*[\])）】]/gi, ' ');
   t = t.replace(/(?:^|[\s._-])(?:part|pt|volume|vol|book)\s*[-_. ]*(?:\d+|[ivxlcdm]+)(?=$|[\s._-])/gi, ' ');
   t = t.replace(/(?:^|[\s._-])제?\s*\d+\s*(?:권|부|편)(?=$|[\s._-])/g, ' ');
   t = t.replace(/(?:^|[\s._-])(?:상권|하권)(?=$|[\s._-])/g, ' ');
-  if (multi) t = t.replace(/(?<![.,\d])\s+\d{1,2}(?=\s*(?:[\[(（【].*)?$)/, '');   // 여러 권으로 묶일 때 끝의 권 번호('사사기 소고 1')는 제목에서 뺀다
   t = t.replace(/_+/g, ' ').replace(/[\s\-–.]+$/, '').replace(/^[\s\-–.]+/, '').replace(/\s+/g, ' ').trim();
   return t || String(name).replace(/\.(?:pdf|epub|md|markdown)$/i, '');
+}
+
+// 권 번호가 있는 책의 제목: '이사야 2권' 처럼 권이 제목에 남게 한다 (파일 이름에서 권 표기가 빠지는 경우를 보충)
+function volTitle(name, part) {
+  const t = displayTitle(name);
+  if (part == null || new RegExp('(?:^|[^0-9])' + part + '(?![0-9])').test(t)) return t;
+  return t + ' ' + part + '권';
 }
 
 // 그룹화 전에 "제3권" 표기를 "3권"으로 통일
@@ -647,4 +642,4 @@ function pickMatchHint(hint, candidates) {
   return best ? { cand: best.c, score: best.sc } : null;
 }
 
-module.exports = { seriesTags, parseTocText, normIsbn, findIsbns, lookupIsbn, magazineInfo, commentaryHints, pickMatchSeries, seriesHints, parseFileName, fileHint, pickMatchHint,  titleScore, matchScore, cleanForSearch, queryVariants, pickMatch,  canonName, searchBookstores, bibleSeed, categorySeed, groupPdfFiles, inferDocumentType, normalized, displayTitle, extractPartNumber };
+module.exports = { volTitle, normalizePdfTitle, seriesTags, parseTocText, normIsbn, findIsbns, lookupIsbn, magazineInfo, commentaryHints, pickMatchSeries, seriesHints, parseFileName, fileHint, pickMatchHint,  titleScore, matchScore, cleanForSearch, queryVariants, pickMatch,  canonName, searchBookstores, bibleSeed, categorySeed, groupPdfFiles, inferDocumentType, normalized, displayTitle, extractPartNumber };
