@@ -158,7 +158,7 @@ function renderSide() {
     ${S.refreshing ? '<div class="busy"><i class="dot"></i>폴더 갱신 중…</div>' : ''}
     <h6>서재</h6>
     ${nav('all', '전체 문헌', cnt.all)}${nav('readlist', '★ 읽기 목록', cnt.readlist)}${nav('reading', '읽는 중', cnt.reading)}${nav('unread', '읽을 예정', cnt.unread)}${nav('finished', '완독', cnt.finished)}${nav('review', '확인 필요', cnt.review, true)}
-    <h6>노트</h6>${S.settings && S.settings.notesDir ? '<button class="nav" data-act="note-search"><span>✎ 노트 검색</span></button>' : ''}<button class="nav" data-act="bible-note"><span>✎ 성경 노트</span></button><button class="nav" data-act="hl-all"><span>▰ 형광펜 모아보기</span></button><button class="nav" data-act="doctrine"><span>☩ 교리·신조</span></button>
+    <h6>노트</h6>${S.settings && S.settings.notesDir ? '<button class="nav" data-act="note-search"><span>✎ 노트 검색</span></button>' : ''}<button class="nav" data-act="bible-note"><span>✎ 성경 노트</span></button><button class="nav" data-act="hl-all"><span>▰ 형광펜 모아보기</span></button>
     <h6>종류</h6>
     <button class="nav ${S.kind === '책' ? 'on' : ''}" data-act="kind" data-v="책"><span>📚 책</span><span class="n">${num(kcnt['책'])}</span></button><button class="nav ${S.kind === '논문' ? 'on' : ''}" data-act="kind" data-v="논문"><span>📄 논문</span><span class="n">${num(kcnt['논문'])}</span></button>
     <h6>성경 66권</h6>
@@ -884,7 +884,6 @@ document.addEventListener('click', async (e) => {
     case 'bible': bibleModal(work(S.open)); break;
     case 'note-search': noteSearchModal(); break;
     case 'hl-all': openHighlights(); break;
-    case 'doctrine': if (window.TLDoctrine) window.TLDoctrine.open(); break;
     case 'bible-note': if (window.TLBibleNote) window.TLBibleNote.open(); break;
     case 'note-open': openNote(work(v) ? work(v).title : '', v); break;
     case 'bookstore': bookstoreModal(work(S.open)); break;
