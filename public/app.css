@@ -462,3 +462,6 @@ body.pane .toasts{z-index:300}
 .dc-menu{position:absolute;right:12px;top:44px;z-index:5;background:#fff;border:1px solid #cfcfc4;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.25);padding:6px;display:flex;flex-direction:column;gap:2px;width:250px}
 .dc-menu button{border:0;background:transparent;text-align:left;padding:7px 9px;border-radius:6px;cursor:pointer}.dc-menu button:hover{background:var(--olive-pale)}.dc-menu small{color:#888;padding:4px 9px}
 @media(max-width:760px){#dc-nav{width:130px}#dc-main{padding:12px}}
+.dc-t{line-height:1.85}.dc-tno{display:inline-block;color:var(--olive);font-size:12.5px;margin-bottom:2px}
+.dc-p{margin:0 0 .7em;text-indent:0}.dc-p:last-child{margin-bottom:0}
+.dc-credit a{color:inherit}

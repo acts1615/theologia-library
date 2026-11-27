@@ -5,7 +5,8 @@
 const fs = require('fs');
 const path = require('path');
 
-const BASE = 'https://raw.githubusercontent.com/acts1615/t9hb/main/client/public/confessions/';
+// 앱에 함께 들어 있는 문서(doctrine/)가 기본이고, 새 문서는 저장소의 같은 폴더에서 받는다. data/교리/ 의 같은 id 문서가 있으면 그것이 먼저다.
+const BASE = 'https://raw.githubusercontent.com/acts1615/theologia-library/main/doctrine/';
 const ID_RE = /^[A-Za-z0-9_-]{1,40}$/;
 
 function plain(lines) { return (lines || []).map((l) => (l.s || []).filter((x) => typeof x === 'string').join('')).join(' ').replace(/\s+/g, ' ').trim(); }
@@ -16,13 +17,14 @@ function validate(d) {
   if (!d.title || !Array.isArray(d.units) || !d.units.length) throw Object.assign(new Error('제목과 units 가 있어야 합니다.'), { status: 400 });
   for (const u of d.units) {
     if (!Number.isFinite(+u.no) || !Array.isArray(u.items)) throw Object.assign(new Error('units 의 모양이 맞지 않습니다.'), { status: 400 });
-    for (const it of u.items) if (!Number.isFinite(+it.no) || !Array.isArray(it.q) || !Array.isArray(it.a)) throw Object.assign(new Error('문답(items)의 모양이 맞지 않습니다.'), { status: 400 });
+    for (const it of u.items) if (!Number.isFinite(+it.no) || !((Array.isArray(it.q) && Array.isArray(it.a)) || Array.isArray(it.t))) throw Object.assign(new Error('항목(items)의 모양이 맞지 않습니다. (q·a 또는 t 가 있어야 합니다)'), { status: 400 });
   }
   return d;
 }
 
 function createDoctrine({ dataDir }) {
   const dir = path.join(dataDir, '교리');
+  const bundled = path.join(__dirname, 'doctrine');
   const memoFile = path.join(dataDir, '교리메모.json');
   let memos = { docs: {} };
   try { const j = JSON.parse(fs.readFileSync(memoFile, 'utf8')); if (j && j.docs) memos = j; } catch {}
@@ -35,25 +37,33 @@ function createDoctrine({ dataDir }) {
   }
   function touch() { dirty = true; clearTimeout(timer); timer = setTimeout(flush, 400); }
 
+  function fileOf(id) {
+    for (const base of [dir, bundled]) { const f = path.join(base, id + '.json'); try { return { f, st: fs.statSync(f) }; } catch {} }
+    return null;
+  }
   function load(id) {
     if (!ID_RE.test(id)) return null;
-    const f = path.join(dir, id + '.json');
-    let st; try { st = fs.statSync(f); } catch { return null; }
-    const c = cache.get(id); if (c && c.mtime === st.mtimeMs) return c;
-    let doc; try { doc = JSON.parse(fs.readFileSync(f, 'utf8')); validate(doc); } catch { return null; }
+    const hit = fileOf(id); if (!hit) return null;
+    const key = hit.f + ':' + hit.st.mtimeMs;
+    const c = cache.get(id); if (c && c.key === key) return c;
+    let doc; try { doc = JSON.parse(fs.readFileSync(hit.f, 'utf8')); validate(doc); } catch { return null; }
     const text = new Map();   // 'u:n' → 검색용 글
-    for (const u of doc.units) for (const it of u.items) text.set(u.no + ':' + it.no, [it.heading || '', plain(it.q), plain(it.a), Object.values(it.notes || {}).join(' ')].join(' '));
-    const v = { mtime: st.mtimeMs, doc, text }; cache.set(id, v); return v;
+    for (const u of doc.units) for (const it of u.items) text.set(u.no + ':' + it.no, [it.heading || '', plain(it.q), plain(it.a), plain(it.t), Object.values(it.notes || {}).join(' ')].join(' '));
+    const v = { key, doc, text }; cache.set(id, v); return v;
+  }
+  function ids() {
+    const set = new Set();
+    for (const base of [dir, bundled]) { try { for (const n of fs.readdirSync(base)) if (n.endsWith('.json') && n !== 'index.json') set.add(n.slice(0, -5)); } catch {} }
+    return [...set];
   }
   function list() {
-    let names = []; try { names = fs.readdirSync(dir).filter((n) => n.endsWith('.json')).map((n) => n.slice(0, -5)); } catch {}
     const out = [];
-    for (const id of names) {
+    for (const id of ids()) {
       const c = load(id); if (!c) continue; const d = c.doc;
       const m = memos.docs[id] || {};
-      out.push({ id, title: d.title, subtitle: d.subtitle || '', short: d.short || d.title, unitLabel: d.unitLabel || '장', itemLabel: d.itemLabel || '문', credit: d.credit || '', units: d.units.length, items: d.units.reduce((n, u) => n + u.items.length, 0), memos: Object.values(m).filter((x) => x.t).length });
+      out.push({ id, order: Number.isFinite(+d.order) ? +d.order : 999, title: d.title, subtitle: d.subtitle || '', short: d.short || d.title, unitLabel: d.unitLabel || '장', itemLabel: d.itemLabel || '문', credit: d.credit || '', units: d.units.length, items: d.units.reduce((n, u) => n + u.items.length, 0), memos: Object.values(m).filter((x) => x.t).length });
     }
-    out.sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.title.localeCompare(b.title, 'ko'));
+    out.sort((a, b) => a.order - b.order || a.title.localeCompare(b.title, 'ko'));
     return out;
   }
   function get(id) {
@@ -84,7 +94,7 @@ function createDoctrine({ dataDir }) {
         const k = u.no + ':' + it.no, memo = m[k] ? m[k].t : '';
         if (memoOnly && !memo) continue;
         const hay = (c.text.get(k) + ' ' + memo).normalize('NFC').toLowerCase();
-        if (terms.every((t) => hay.includes(t))) out.push({ doc: e.id, docTitle: e.title, short: e.short, unit: u.no, unitTitle: u.title || (u.no + e.unitLabel), item: it.no, itemLabel: e.itemLabel, q: plain(it.q), memo, at: m[k] ? m[k].at : '' });
+        if (terms.every((t) => hay.includes(t))) out.push({ doc: e.id, docTitle: e.title, short: e.short, unit: u.no, unitTitle: u.title || (u.no + e.unitLabel), item: it.no, itemLabel: e.itemLabel, q: plain(it.q) || it.heading || plain(it.t).slice(0, 120), label: it.label || `제${it.no}${e.itemLabel}`, memo, at: m[k] ? m[k].at : '' });
         if (out.length >= 500) return out;
       }
     }
@@ -95,6 +105,7 @@ function createDoctrine({ dataDir }) {
     if (!/^https:\/\//.test(base)) throw Object.assign(new Error('https 주소만 쓸 수 있습니다.'), { status: 400 });
     const get = async (u) => { const r = await fetch(u, { redirect: 'follow' }); if (!r.ok) throw new Error(`${u} → ${r.status}`); return r.json(); };
     const idx = await get(base + 'index.json'); if (!Array.isArray(idx)) throw new Error('목록 형식이 맞지 않습니다.');
+    if (!base.endsWith('/')) base += '/';
     const got = [], failed = [];
     for (const e of idx) {
       if (!e || !ID_RE.test(String(e.id || ''))) continue;
