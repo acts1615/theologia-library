@@ -76,6 +76,7 @@ function createServer({ publicDir, dataDir, settingsDirs = [], restart = null })
   const indexer = require('./indexsvc.js').createIndexer({ store, search, dataDir, publicDir });
   indexer.kick(45000);
   const hl = require('./highlights.js').createHighlights({ dataDir, store });
+  const doctrine = require('./doctrine.js').createDoctrine({ dataDir });
   const indexHtml = path.join(publicDir, 'index.html');
   async function autofillOne(wid, force) {
     const w = store.workById(wid); if (!w) return { status: 'missing' };
@@ -344,6 +345,19 @@ function createServer({ publicDir, dataDir, settingsDirs = [], restart = null })
         return out ? sendJson(res, 200, store.snapshot()) : sendJson(res, 404, { error: '파일 또는 작품을 찾을 수 없습니다.' });
       }
 
+      if (p.startsWith('/api/doctrine')) {
+        try {
+          const q = url.searchParams;
+          if (p === '/api/doctrine' && m === 'GET') return sendJson(res, 200, { docs: doctrine.list() });
+          if (p === '/api/doctrine/search' && m === 'GET') return sendJson(res, 200, { items: doctrine.search({ q: q.get('q') || '', docId: q.get('doc') || '', memoOnly: q.get('memo') === '1' }) });
+          if (p === '/api/doctrine/import' && m === 'POST') { const b = await readBody(req, 8 * 1024 * 1024); const docs = Array.isArray(b) ? b : [b]; return sendJson(res, 200, { got: docs.map((d) => doctrine.putDoc(d)) }); }
+          if (p === '/api/doctrine/fetch' && m === 'POST') { const b = await readBody(req); return sendJson(res, 200, await doctrine.fetchRemote(b && b.base)); }
+          const g = p.match(/^\/api\/doctrine\/([A-Za-z0-9_-]+)$/);
+          if (g && m === 'GET') return sendJson(res, 200, doctrine.get(g[1]));
+          const mm = p.match(/^\/api\/doctrine\/([A-Za-z0-9_-]+)\/memo$/);
+          if (mm && m === 'PUT') { const b = await readBody(req, 1024 * 1024); return sendJson(res, 200, doctrine.setMemo(mm[1], b.u, b.n, b.text)); }
+        } catch (e) { return sendJson(res, e.status || 400, { error: e.message }); }
+      }
       if (p.startsWith('/api/hl')) {
         try {
           if (p === '/api/hl' && m === 'GET') return sendJson(res, 200, { items: url.searchParams.get('fileId') ? hl.forFile(url.searchParams.get('fileId')) : hl.all({ q: url.searchParams.get('q'), color: url.searchParams.get('color') }) });
@@ -411,7 +425,7 @@ function createServer({ publicDir, dataDir, settingsDirs = [], restart = null })
       if (!res.headersSent) sendJson(res, 500, { error: '서버 오류가 발생했습니다.' }); else res.end();
     }
   });
-  server.on('close', () => { store.flush(); hl.flush(); indexer.close(); search.close(); });
+  server.on('close', () => { store.flush(); hl.flush(); doctrine.flush(); indexer.close(); search.close(); });
   server.flushStore = () => store.flush();
   return server;
 }
